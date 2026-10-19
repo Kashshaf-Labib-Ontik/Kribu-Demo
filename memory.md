@@ -4,9 +4,9 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Current status
 
-- **Lifecycle:** Iteration 3 implemented and live-verified; working tree is uncommitted pending owner review.
-- **Active area:** Keycloak identity, trusted request context, tenant schema, and PostgreSQL RLS.
-- **Application code:** Iteration 2 is committed and pushed; the identity and tenant boundary now works locally and is awaiting review.
+- **Lifecycle:** Iteration 3 is owner-reviewed, committed, pushed, and live-verified. Iteration 4 is the next planned implementation slice.
+- **Active area:** OPA RBAC/ABAC policy foundation, authorization decision logging, and policy tests.
+- **Application code:** Identity and tenant isolation are now part of the committed baseline on `dev-v1.0.x`.
 - **Selected stories:** NGO Project, HR Employee History, Client Complaint Patterns.
 - **Data:** Synthetic demo packs must be created; no client data sources are available.
 - **Cost constraint:** Demo uses free/open-source infrastructure and Gemini free-tier inference for synthetic data; no paid billing is enabled.
@@ -22,7 +22,7 @@ This is the current implementation handoff. Update it in every material implemen
 - Iteration 1 was committed and pushed on `dev-v1.0.x`.
 - The Gemini decision and standalone web-container fix were committed and pushed.
 - Iteration 2 was committed and pushed as `4d43182` with a typed `ModelProvider`, Gemini adapter, synthetic-only enforcement, structured output, streaming, function selection, metadata, and live verification.
-- Iteration 3 adds a pinned Keycloak realm, strict OIDC validation, tenant-scoped sessions, Alembic migrations, a restricted runtime database role, and forced PostgreSQL RLS.
+- Iteration 3 was committed and pushed as `62a3c5c` with a pinned Keycloak realm, strict OIDC validation, tenant-scoped sessions, Alembic migrations, a restricted runtime database role, and forced PostgreSQL RLS.
 
 ## Current decisions
 
@@ -47,9 +47,9 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Current file/area being worked on
 
-- `services/api/app/identity`: token validation, trusted identity contracts, and tenant session context.
-- `services/api/migrations`: tenant/user schema, synthetic profiles, and RLS policies.
-- `infra/keycloak` and `compose.yaml`: local identity service and repeatable realm import.
+- `policies/`: planned OPA/Rego policy modules and policy tests.
+- `services/api/app/policy`: planned policy client, authorization service, and decision contracts.
+- `services/api/app/audit`: planned authorization decision audit records.
 
 ## Verification performed
 
@@ -79,7 +79,7 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Next step
 
-Present Iteration 3 for owner review and commit only after explicit approval. Iteration 4 then introduces OPA RBAC/ABAC policy decisions and audit records.
+Start Iteration 4 by adding OPA RBAC/ABAC policy decisions, canonical authorization attributes, safe denial behavior, and audit records.
 
 ## Update template
 

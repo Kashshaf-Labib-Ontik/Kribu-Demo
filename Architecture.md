@@ -1,6 +1,6 @@
 # KRIBU Demo Architecture
 
-**Status:** Active implementation architecture through Iteration 3
+**Status:** Active implementation architecture after committed Iteration 3; Iteration 4 policy enforcement is next
 
 **Primary orchestration:** LangGraph
 

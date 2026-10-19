@@ -84,4 +84,4 @@ docker compose config --quiet
 
 ## Current status
 
-Iteration 2 is committed and live-verified. Iteration 3 is implemented and live-verified in the uncommitted working tree: local Keycloak identity, strict JWT validation, trusted request context, Alembic-managed tenant tables, and PostgreSQL RLS. It is awaiting owner review.
+Iterations 0-3 are committed, pushed, and live-verified on `dev-v1.0.x`. The current baseline includes local Keycloak identity, strict JWT validation, trusted request context, Alembic-managed tenant tables, a restricted API database role, and PostgreSQL RLS. Iteration 4 is next: OPA-backed RBAC/ABAC policy decisions and authorization audit records.

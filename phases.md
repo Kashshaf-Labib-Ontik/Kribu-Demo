@@ -165,4 +165,4 @@ Use a small working exercise for each topic rather than completing long courses 
 
 ## 8. Current delivery gate
 
-Iterations 0-2 are owner-reviewed and committed on `dev-v1.0.x`. Iteration 3 establishes authentication and the tenant boundary. Each subsequent iteration remains uncommitted until its focused checks pass and the owner reviews the working-tree changes.
+Iterations 0-3 are owner-reviewed, committed, and pushed on `dev-v1.0.x`. Iteration 4 is next and introduces OPA-backed RBAC/ABAC policy decisions and audit records. Each subsequent iteration remains uncommitted until its focused checks pass and the owner reviews the working-tree changes.

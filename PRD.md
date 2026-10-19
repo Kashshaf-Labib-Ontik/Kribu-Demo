@@ -1,6 +1,6 @@
 # KRIBU Demo Product Requirements
 
-**Status:** Active delivery baseline through Iteration 3
+**Status:** Active delivery baseline after committed Iteration 3; Iteration 4 RBAC/ABAC is next
 
 **Scope:** Local, synthetic-data demo
 
@@ -146,7 +146,7 @@ The demo is accepted when:
 ## 9. Constraints and assumptions
 
 - English-first; data structures remain Unicode and Bangla-ready.
-- One demo tenant is sufficient, but tenant isolation is implemented from the first schema.
+- Two synthetic tenants are seeded to prove isolation; future client deployments may onboard additional tenants through mapped identity and ACL attributes.
 - Reference development hardware has 16 GB total system RAM and integrated Intel UHD graphics using shared memory. The demo therefore uses Gemini free-tier inference instead of requiring local LLM inference.
 - All provider calls remain behind a replaceable interface so a future private or self-hosted provider can be introduced without changing skills or graphs.
 - Gemini free-tier calls are restricted to synthetic demo data; real client information is prohibited because Google may use unpaid-service content for product improvement and human review.
