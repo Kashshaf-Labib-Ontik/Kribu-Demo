@@ -44,7 +44,7 @@ Start the complete local foundation:
 docker compose up --build
 ```
 
-The Studio runs at `http://localhost:3000`, the API at `http://localhost:8000`, Keycloak at `http://localhost:8180`, and API documentation at `http://localhost:8000/docs` in development. Compose bootstraps the restricted API database role, applies Alembic migrations, and imports the synthetic Keycloak realm.
+The Studio runs at `http://localhost:3000`, the API at `http://localhost:8000`, Keycloak at `http://localhost:8180`, and API documentation at `http://localhost:8000/docs` in development. Compose also runs OPA internally, bootstraps the restricted API database role, applies Alembic migrations, and imports the synthetic Keycloak realm.
 
 Add a Google AI Studio key to your uncommitted `.env` as `KRIBU_GEMINI_API_KEY`. Verify structured output, streaming, usage metadata, and function selection with the script's built-in synthetic prompts:
 
@@ -66,10 +66,21 @@ Set-Location ../..
 
 The local demo usernames and replaceable development passwords are documented in `.env.example`. The `kribu-verifier` password flow exists only for this verification command; Studio will use authorization code with PKCE in a later iteration.
 
+Verify the Guard's synthetic records through Keycloak, API, OPA, RLS, and audit storage:
+
+```powershell
+Set-Location services/api
+uv run python -m scripts.verify_guard --confirm-synthetic
+Set-Location ../..
+docker compose run --rm -v ./policies/tests:/tests opa test --fail-on-empty /policies /tests
+```
+
+The protected API is `GET /v1/demo/resources/{resource_id}`. Seeded IDs are in `scripts/verify_guard.py`. Mike is denied the synthetic salary record, Helen can read it, and tenant-crossing reads return the same safe `404` as unavailable records. OPA has no host port; only the API makes policy decisions. The record content and salary amount are fictional.
+
 For faster application development, run PostgreSQL in Docker and the applications on the host:
 
 ```powershell
-docker compose up -d postgres db-bootstrap migrate keycloak-postgres keycloak
+docker compose up -d postgres db-bootstrap migrate keycloak-postgres keycloak opa
 uv run --package kribu-api uvicorn app.main:app --app-dir services/api --reload
 pnpm dev:web
 ```
@@ -84,4 +95,4 @@ docker compose config --quiet
 
 ## Current status
 
-Iterations 0-3 are committed, pushed, and live-verified on `dev-v1.0.x`. The current baseline includes local Keycloak identity, strict JWT validation, trusted request context, Alembic-managed tenant tables, a restricted API database role, and PostgreSQL RLS. Iteration 4 is next: OPA-backed RBAC/ABAC policy decisions and authorization audit records.
+Iterations 0-3 are committed and pushed on `dev-v1.0.x`. Iteration 4 is implemented and live-verified in the working tree, pending owner review. It adds OPA-backed RBAC/ABAC, resource ACL metadata, a protected synthetic read path, and append-only runtime audit records. Document ingestion and natural-language query enforcement are later iterations.

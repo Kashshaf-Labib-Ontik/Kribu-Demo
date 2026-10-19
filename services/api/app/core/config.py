@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     oidc_jwks_url: str = "http://localhost:8180/realms/kribu-demo/protocol/openid-connect/certs"
     oidc_audience: str = "kribu-api"
     oidc_clock_skew_seconds: int = Field(default=30, ge=0, le=120)
+    opa_url: AnyHttpUrl = AnyHttpUrl("http://localhost:8181")
+    opa_timeout_seconds: float = Field(default=2, gt=0, le=10)
+    opa_policy_version: str = Field(default="guard-v1", min_length=1)
     model_provider: Literal["gemini"] = "gemini"
     model_data_policy: Literal["synthetic_only"] = "synthetic_only"
     gemini_api_key: SecretStr | None = None

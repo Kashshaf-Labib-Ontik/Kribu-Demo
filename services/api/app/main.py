@@ -16,6 +16,8 @@ from app.core.config import get_settings
 from app.core.database import create_session_factory
 from app.identity.errors import IdentityError
 from app.identity.tokens import OidcTokenVerifier
+from app.policy.client import OpaClient
+from app.policy.errors import PolicyError
 
 
 @asynccontextmanager
@@ -25,7 +27,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.database_engine = engine
     app.state.database_session_factory = create_session_factory(engine)
     app.state.token_verifier = OidcTokenVerifier(settings)
+    app.state.opa_client = OpaClient(
+        str(settings.opa_url),
+        settings.opa_timeout_seconds,
+        settings.opa_policy_version,
+    )
     yield
+    await app.state.opa_client.close()
     await engine.dispose()
 
 
@@ -55,6 +63,20 @@ def create_app() -> FastAPI:
             content={
                 "type": "about:blank",
                 "title": "Unauthorized" if exc.status_code == 401 else "Forbidden",
+                "status": exc.status_code,
+                "detail": exc.safe_message,
+                "code": exc.code,
+                "correlation_id": request.state.correlation_id,
+            },
+        )
+
+    @application.exception_handler(PolicyError)
+    async def policy_error(request: Request, exc: PolicyError) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "type": "about:blank",
+                "title": "Not Found" if exc.status_code == 404 else "Service unavailable",
                 "status": exc.status_code,
                 "detail": exc.safe_message,
                 "code": exc.code,

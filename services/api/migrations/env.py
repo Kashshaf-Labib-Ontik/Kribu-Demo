@@ -8,9 +8,11 @@ from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+from app.audit import models as audit_models  # noqa: F401
 from app.core.config import get_settings
 from app.core.database import Base
 from app.identity import models as identity_models  # noqa: F401
+from app.policy import models as policy_models  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

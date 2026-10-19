@@ -108,6 +108,15 @@ services:
     mem_limit: 768m
     restart: unless-stopped
 
+  opa:
+    image: openpolicyagent/opa:1.21.2
+    command: ["run", "--server", "--addr=0.0.0.0:8181", "/policies"]
+    volumes:
+      - ./policies/rego:/policies:ro
+    networks: [policy_internal]
+    mem_limit: 256m
+    restart: unless-stopped
+
   api:
     build:
       context: .
@@ -121,6 +130,9 @@ services:
       KRIBU_OIDC_JWKS_URL: http://keycloak:8080/realms/kribu-demo/protocol/openid-connect/certs
       KRIBU_OIDC_AUDIENCE: kribu-api
       KRIBU_OIDC_CLOCK_SKEW_SECONDS: ${KRIBU_OIDC_CLOCK_SKEW_SECONDS:-30}
+      KRIBU_OPA_URL: http://opa:8181
+      KRIBU_OPA_TIMEOUT_SECONDS: ${KRIBU_OPA_TIMEOUT_SECONDS:-2}
+      KRIBU_OPA_POLICY_VERSION: ${KRIBU_OPA_POLICY_VERSION:-guard-v1}
       KRIBU_MODEL_PROVIDER: ${KRIBU_MODEL_PROVIDER:-gemini}
       KRIBU_MODEL_DATA_POLICY: ${KRIBU_MODEL_DATA_POLICY:-synthetic_only}
       KRIBU_GEMINI_API_KEY: ${KRIBU_GEMINI_API_KEY:-}
@@ -131,11 +143,14 @@ services:
       KRIBU_GEMINI_RETRY_ATTEMPTS: ${KRIBU_GEMINI_RETRY_ATTEMPTS:-3}
     ports:
       - "${API_PORT:-8000}:8000"
+    networks: [default, policy_internal]
     depends_on:
       migrate:
         condition: service_completed_successfully
       keycloak:
         condition: service_healthy
+      opa:
+        condition: service_started
     healthcheck:
       test:
         [
@@ -177,4 +192,8 @@ services:
 volumes:
   kribu_postgres_data:
   kribu_keycloak_postgres_data:
+
+networks:
+  policy_internal:
+    internal: true
 

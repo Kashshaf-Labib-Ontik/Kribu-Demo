@@ -58,7 +58,7 @@ The commit messages below are targets and may be adjusted to match the actual sl
 ### Iteration 4 - RBAC and ABAC policy
 
 - Add OPA policies, canonical attributes, decision logging, and policy tests.
-- Prove that paraphrasing Roger Albert's salary query cannot bypass policy.
+- Prove Roger Albert's synthetic salary record is inaccessible to Mike through the protected API, even if callers supply forged tenant/role parameters. Full natural-language paraphrase tests follow authorized retrieval and Engine integration.
 - **Commit:** `Enforce RBAC and ABAC policies`
 
 ### Iteration 5 - Document upload and versioning
@@ -165,4 +165,4 @@ Use a small working exercise for each topic rather than completing long courses 
 
 ## 8. Current delivery gate
 
-Iterations 0-3 are owner-reviewed, committed, and pushed on `dev-v1.0.x`. Iteration 4 is next and introduces OPA-backed RBAC/ABAC policy decisions and audit records. Each subsequent iteration remains uncommitted until its focused checks pass and the owner reviews the working-tree changes.
+Iterations 0-3 are owner-reviewed, committed, and pushed on `dev-v1.0.x`. Iteration 4 is implemented and live-verified in the working tree, pending owner review. It adds OPA-backed RBAC/ABAC, reusable resource ACL metadata, a protected synthetic read, and audit records. Iteration 5 begins document upload after the reviewed Guard slice is accepted. No implementation commit or push occurs without explicit owner approval.

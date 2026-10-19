@@ -4,9 +4,9 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Current status
 
-- **Lifecycle:** Iteration 3 is owner-reviewed, committed, pushed, and live-verified. Iteration 4 is the next planned implementation slice.
-- **Active area:** OPA RBAC/ABAC policy foundation, authorization decision logging, and policy tests.
-- **Application code:** Identity and tenant isolation are now part of the committed baseline on `dev-v1.0.x`.
+- **Lifecycle:** Iterations 0-3 are committed and pushed. Iteration 4 is implemented and live-verified in the working tree, pending owner review.
+- **Active area:** Guard review and handoff; document upload is the next implementation slice.
+- **Application code:** Keycloak identity and RLS are committed; OPA RBAC/ABAC, protected synthetic resource access, and authorization audit are uncommitted.
 - **Selected stories:** NGO Project, HR Employee History, Client Complaint Patterns.
 - **Data:** Synthetic demo packs must be created; no client data sources are available.
 - **Cost constraint:** Demo uses free/open-source infrastructure and Gemini free-tier inference for synthetic data; no paid billing is enabled.
@@ -23,6 +23,7 @@ This is the current implementation handoff. Update it in every material implemen
 - The Gemini decision and standalone web-container fix were committed and pushed.
 - Iteration 2 was committed and pushed as `4d43182` with a typed `ModelProvider`, Gemini adapter, synthetic-only enforcement, structured output, streaming, function selection, metadata, and live verification.
 - Iteration 3 was committed and pushed as `62a3c5c` with a pinned Keycloak realm, strict OIDC validation, tenant-scoped sessions, Alembic migrations, a restricted runtime database role, and forced PostgreSQL RLS.
+- Iteration 4 implementation adds pinned OPA `1.21.2`, `guard-v1` Rego policy, canonical subject/resource/action inputs, ACL metadata, synthetic proof content, and tenant-scoped append-only runtime audit. It awaits owner review before commit.
 
 ## Current decisions
 
@@ -47,9 +48,9 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Current file/area being worked on
 
-- `policies/`: planned OPA/Rego policy modules and policy tests.
-- `services/api/app/policy`: planned policy client, authorization service, and decision contracts.
-- `services/api/app/audit`: planned authorization decision audit records.
+- `policies/`: implemented OPA/Rego policy and 12 focused policy tests.
+- `services/api/app/policy`: implemented OPA client, canonical contracts, metadata mapping, and protected read service.
+- `services/api/app/audit`: implemented tenant-scoped decision audit; documentation and review are active.
 
 ## Verification performed
 
@@ -70,6 +71,11 @@ This is the current implementation handoff. Update it in every material implemen
 - The restricted `kribu_app` database role is created idempotently and Alembic applies the initial tenant migration.
 - Live OIDC verification succeeds for Mike and the second-tenant user; anonymous access returns `401`.
 - Live RLS verification returns zero tenants without context, exactly one matching tenant per context, and blocks a cross-tenant insert.
+- Iteration 4 OPA policy tests pass (12/12); Ruff, mypy, and 32 API tests pass with one upstream TestClient warning.
+- Both migrations applied successfully on the existing volume and a fresh temporary database; Alembic reported no schema drift. The temporary verification database was removed afterward.
+- Live Guard verifier confirms Mike salary denial, Helen HR access, Priya programs access, Evan isolation, ignored caller-supplied role/tenant parameters, persisted allow/deny audits, zero resource rows without tenant context, and no runtime audit-update privilege.
+- Stopping OPA made API readiness return `503` and a protected read return `503` without content; OPA was restored afterward.
+- OPA is isolated on an internal Compose network shared only with the API; its REST API is not published to the host.
 
 ## Known open questions
 
@@ -79,7 +85,7 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Next step
 
-Start Iteration 4 by adding OPA RBAC/ABAC policy decisions, canonical authorization attributes, safe denial behavior, and audit records.
+Owner reviews the uncommitted Iteration 4 Guard slice. After approval, commit with a concise message; then begin Iteration 5 document upload and versioning.
 
 ## Update template
 

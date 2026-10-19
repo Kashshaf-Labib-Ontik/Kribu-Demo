@@ -1,6 +1,6 @@
 # KRIBU Demo Product Requirements
 
-**Status:** Active delivery baseline after committed Iteration 3; Iteration 4 RBAC/ABAC is next
+**Status:** Iteration 4 Guard implementation is live-verified in the working tree, pending owner review
 
 **Scope:** Local, synthetic-data demo
 

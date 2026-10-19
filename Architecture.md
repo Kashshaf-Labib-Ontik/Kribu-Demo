@@ -1,6 +1,6 @@
 # KRIBU Demo Architecture
 
-**Status:** Active implementation architecture after committed Iteration 3; Iteration 4 policy enforcement is next
+**Status:** Iteration 4 Guard implementation is live-verified in the working tree, pending owner review
 
 **Primary orchestration:** LangGraph
 
@@ -70,10 +70,10 @@ OPA receives a normalized, non-LLM input:
 
 ```json
 {
-  "subject": {"tenant_id": "t1", "user_id": "mike", "roles": ["engineer"], "department": "engineering"},
-  "action": "document.read",
-  "resource": {"tenant_id": "t1", "type": "employee_record", "classification": "restricted_hr", "owner_id": "roger"},
-  "environment": {"purpose": "general_query", "skill": "hr_history"}
+  "subject": {"tenant_id": "t1", "subject_id": "mike-id", "roles": ["employee"], "department": "engineering"},
+  "action": "resource.read",
+  "resource": {"id": "record-id", "tenant_id": "t1", "resource_type": "employee_record", "classification": "restricted_hr", "department": "human-resources", "owner_subject_id": "roger-id", "grants": [{"principal_type": "role", "principal_id": "hr_manager", "action": "resource.read"}]},
+  "environment": {"purpose": "demo_resource_read"}
 }
 ```
 
@@ -87,6 +87,14 @@ For a query such as "What is Mr Albert's salary?", Mike's role and department do
 - Client adapters map source-specific roles, groups, labels, and ACLs into this canonical model.
 - Policy bundles are versioned per tenant and domain, not hard-coded around employee names or one database schema.
 - Missing mappings deny access and enter an administrative review queue.
+
+### Implemented Guard slice (Iteration 4)
+
+OPA `1.21.2` runs on a private Compose network shared only with the API; it has no host port. `OpaClient` sends typed canonical attributes to `data.kribu.authz.decision` and rejects missing/malformed results, timeouts, and unexpected policy versions. API readiness checks the loaded `guard-v1` policy version. The initial Rego policy recognizes `internal` and `restricted_hr`; every read needs a matching ACL grant, and `restricted_hr` also needs the `hr_manager` role. An administrator or auditor has no implicit content access.
+
+The protected `GET /v1/demo/resources/{resource_id}` path resolves an active database profile, fetches only the resource descriptor and ACL under tenant RLS, evaluates policy, records a separate audit transaction, and then fetches synthetic content on allow. The profile's database department is used, not the token's potentially stale department. Unknown resource labels deny. Missing or inaccessible resources share a safe `404`; policy or audit failure gives `503` without releasing content. Even an absent resource makes a policy call, so a policy outage does not distinguish its existence through response status.
+
+`resource_descriptors` and `resource_acl_grants` are the reusable metadata boundary for future documents. `demo_resource_content` is temporary synthetic proof data. `authorization_audit_events` is tenant-scoped; the runtime role may insert/select but cannot update/delete. Audit input holds identifiers and policy metadata, never token, query text, or content. Natural-language paraphrase resistance is completed when Brain and Engine route every resolved resource through this Guard and apply authorization inside search.
 
 ## 5. KRIBU Brain
 
