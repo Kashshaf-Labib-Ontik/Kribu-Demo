@@ -1,0 +1,13 @@
+# Integration-test overlay: publishes PostgreSQL and OPA on dedicated loopback ports so
+# host-side pytest can reach them without clashing with other local services. The default
+# stack keeps OPA on the internal policy network with no host port.
+#   docker compose -f compose.yaml -f compose.integration.yaml up -d postgres db-bootstrap opa
+#   pnpm test:integration
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:${KRIBU_TEST_POSTGRES_PORT:-15432}:5432"
+  opa:
+    networks: [policy_internal, default]
+    ports:
+      - "127.0.0.1:${KRIBU_TEST_OPA_PORT:-18181}:8181"

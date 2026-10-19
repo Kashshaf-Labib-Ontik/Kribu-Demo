@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "dev-*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "24.21.0"
+  UV_VERSION: "0.12.22"
+  OPA_IMAGE: openpolicyagent/opa:1.21.2
+  UV_FROZEN: "1" # a stale uv.lock fails instead of being re-resolved
+
+jobs:
+  check:
+    name: Lint, types and unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # version comes from package.json "packageManager"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+      - run: pnpm install --frozen-lockfile
+      - run: uv sync --frozen --package kribu-api
+      - run: pnpm check
+
+  policy:
+    name: OPA policy tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: opa test
+        run: >-
+          docker run --rm
+          -v "$GITHUB_WORKSPACE/policies:/policies:ro"
+          "$OPA_IMAGE" test --fail-on-empty /policies/rego /policies/tests
+
+  integration:
+    name: Integration tests (PostgreSQL RLS + OPA)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.7-pg18-bookworm
+        env:
+          POSTGRES_DB: kribu
+          POSTGRES_USER: kribu
+          POSTGRES_PASSWORD: kribu_dev_only
+        ports:
+          - "15432:5432"
+        options: >-
+          --health-cmd "pg_isready -U kribu -d kribu"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+      - run: uv sync --frozen --package kribu-api
+      - name: Create the restricted runtime role
+        env:
+          PGPASSWORD: kribu_dev_only
+        run: >-
+          psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 15432 -U kribu -d kribu
+          -v app_user=kribu_app -v app_password=kribu_app_dev_only -v app_database=kribu
+          -f infra/compose/postgres/bootstrap/001_app_role.sql
+      - name: Start OPA
+        run: |
+          docker run -d --name opa -p 127.0.0.1:18181:8181 \
+            -v "$GITHUB_WORKSPACE/policies/rego:/policies:ro" \
+            "$OPA_IMAGE" run --server --addr=0.0.0.0:8181 /policies
+          for attempt in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:18181/v1/data/kribu/authz/policy_version && exit 0
+            sleep 1
+          done
+          docker logs opa
+          exit 1
+      - run: uv run --frozen --package kribu-api pytest -m integration --run-integration

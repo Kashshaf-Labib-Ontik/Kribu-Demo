@@ -10,12 +10,14 @@ from uuid import uuid4
 import asyncpg  # type: ignore[import-untyped]
 import httpx
 
-DEMO_TENANT = "11111111-1111-4111-8111-111111111111"
-OTHER_TENANT = "22222222-2222-4222-8222-222222222222"
-SALARY = "10000000-0000-4000-8000-000000000001"
-ENGINEERING = "10000000-0000-4000-8000-000000000002"
-NGO = "10000000-0000-4000-8000-000000000003"
-OTHER = "10000000-0000-4000-8000-000000000004"
+from scripts import seed_demo
+
+DEMO_TENANT = str(seed_demo.DEMO_TENANT)
+OTHER_TENANT = str(seed_demo.OTHER_TENANT)
+SALARY = str(seed_demo.SALARY)
+ENGINEERING = str(seed_demo.ENGINEERING)
+NGO = str(seed_demo.NGO)
+OTHER = str(seed_demo.OTHER)
 
 
 @dataclass(frozen=True)

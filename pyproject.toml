@@ -15,4 +15,7 @@ members = ["services/api"]
 addopts = "-q"
 pythonpath = ["services/api"]
 testpaths = ["services/api/tests"]
+markers = [
+    "integration: needs PostgreSQL and OPA; opt in with --run-integration (see README)",
+]
 

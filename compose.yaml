@@ -25,13 +25,12 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD:-kribu_dev_only}
       POSTGRES_DB: ${POSTGRES_DB:-kribu}
       POSTGRES_USER: ${POSTGRES_USER:-kribu}
-      KRIBU_APP_DB_USER: ${KRIBU_APP_DB_USER:-kribu_app}
       KRIBU_APP_DB_PASSWORD: ${KRIBU_APP_DB_PASSWORD:-kribu_app_dev_only}
     volumes:
       - ./infra/compose/postgres/bootstrap:/bootstrap:ro
     command: >-
       sh -c 'psql -v ON_ERROR_STOP=1
-      -v app_user="$${KRIBU_APP_DB_USER}"
+      -v app_user=kribu_app
       -v app_password="$${KRIBU_APP_DB_PASSWORD}"
       -v app_database="$${POSTGRES_DB}"
       -h postgres -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
@@ -47,11 +46,23 @@ services:
       dockerfile: services/api/Dockerfile
     environment:
       KRIBU_ENVIRONMENT: development
-      KRIBU_DATABASE_URL: postgresql+asyncpg://${KRIBU_APP_DB_USER:-kribu_app}:${KRIBU_APP_DB_PASSWORD:-kribu_app_dev_only}@postgres:5432/${POSTGRES_DB:-kribu}
+      KRIBU_DATABASE_URL: postgresql+asyncpg://kribu_app:${KRIBU_APP_DB_PASSWORD:-kribu_app_dev_only}@postgres:5432/${POSTGRES_DB:-kribu}
       KRIBU_MIGRATION_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-kribu}:${POSTGRES_PASSWORD:-kribu_dev_only}@postgres:5432/${POSTGRES_DB:-kribu}
     command: ["uv", "run", "--frozen", "--no-dev", "alembic", "upgrade", "head"]
     depends_on:
       db-bootstrap:
+        condition: service_completed_successfully
+    restart: "no"
+
+  seed:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    environment:
+      KRIBU_MIGRATION_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-kribu}:${POSTGRES_PASSWORD:-kribu_dev_only}@postgres:5432/${POSTGRES_DB:-kribu}
+    command: ["uv", "run", "--frozen", "--no-dev", "python", "-m", "scripts.seed_demo"]
+    depends_on:
+      migrate:
         condition: service_completed_successfully
     restart: "no"
 
@@ -124,7 +135,7 @@ services:
     environment:
       KRIBU_ENVIRONMENT: development
       KRIBU_LOG_LEVEL: ${KRIBU_LOG_LEVEL:-INFO}
-      KRIBU_DATABASE_URL: postgresql+asyncpg://${KRIBU_APP_DB_USER:-kribu_app}:${KRIBU_APP_DB_PASSWORD:-kribu_app_dev_only}@postgres:5432/${POSTGRES_DB:-kribu}
+      KRIBU_DATABASE_URL: postgresql+asyncpg://kribu_app:${KRIBU_APP_DB_PASSWORD:-kribu_app_dev_only}@postgres:5432/${POSTGRES_DB:-kribu}
       KRIBU_CORS_ORIGINS: '["http://localhost:${WEB_PORT:-3000}"]'
       KRIBU_OIDC_ISSUER_URL: http://localhost:${KEYCLOAK_PORT:-8180}/realms/kribu-demo
       KRIBU_OIDC_JWKS_URL: http://keycloak:8080/realms/kribu-demo/protocol/openid-connect/certs
@@ -145,7 +156,7 @@ services:
       - "${API_PORT:-8000}:8000"
     networks: [default, policy_internal]
     depends_on:
-      migrate:
+      seed:
         condition: service_completed_successfully
       keycloak:
         condition: service_healthy

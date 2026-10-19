@@ -13,6 +13,8 @@
     "lint:web": "pnpm --filter @kribu/web lint",
     "typecheck:web": "pnpm --filter @kribu/web typecheck",
     "test:api": "uv run --package kribu-api pytest",
+    "test:integration": "uv run --package kribu-api pytest -m integration --run-integration",
+    "test:policy": "docker compose run --rm --no-deps -v ./policies/tests:/tests opa test --fail-on-empty /policies /tests",
     "lint:api": "uv run --package kribu-api ruff check services/api",
     "format:api": "uv run --package kribu-api ruff format services/api",
     "typecheck:api": "uv run --package kribu-api mypy services/api/app",

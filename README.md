@@ -44,7 +44,15 @@ Start the complete local foundation:
 docker compose up --build
 ```
 
-The Studio runs at `http://localhost:3000`, the API at `http://localhost:8000`, Keycloak at `http://localhost:8180`, and API documentation at `http://localhost:8000/docs` in development. Compose also runs OPA internally, bootstraps the restricted API database role, applies Alembic migrations, and imports the synthetic Keycloak realm.
+The Studio runs at `http://localhost:3000`, the API at `http://localhost:8000`, Keycloak at `http://localhost:8180`, and API documentation at `http://localhost:8000/docs` in development. Compose also runs OPA internally, bootstraps the restricted API database role, applies Alembic migrations, seeds the synthetic demo tenants and records (`scripts/seed_demo.py`), and imports the synthetic Keycloak realm.
+
+Migrations are schema-only and the runtime `kribu_app` role is read-only on authorization data (append-only on audit). A database created before this change still has the old grants and seed rows from earlier migrations; recreate it once:
+
+```powershell
+docker compose down
+docker volume rm kribu_kribu_postgres_data
+docker compose up --build
+```
 
 Add a Google AI Studio key to your uncommitted `.env` as `KRIBU_GEMINI_API_KEY`. Verify structured output, streaming, usage metadata, and function selection with the script's built-in synthetic prompts:
 
@@ -72,26 +80,38 @@ Verify the Guard's synthetic records through Keycloak, API, OPA, RLS, and audit 
 Set-Location services/api
 uv run python -m scripts.verify_guard --confirm-synthetic
 Set-Location ../..
-docker compose run --rm -v ./policies/tests:/tests opa test --fail-on-empty /policies /tests
+pnpm test:policy
 ```
 
-The protected API is `GET /v1/demo/resources/{resource_id}`. Seeded IDs are in `scripts/verify_guard.py`. Mike is denied the synthetic salary record, Helen can read it, and tenant-crossing reads return the same safe `404` as unavailable records. OPA has no host port; only the API makes policy decisions. The record content and salary amount are fictional.
+The protected API is `GET /v1/demo/resources/{resource_id}`. Seeded IDs are in `scripts/seed_demo.py`. Mike is denied the synthetic salary record, Helen can read it, and tenant-crossing reads return the same safe `404` as unavailable records. OPA has no host port; only the API makes policy decisions. The record content and salary amount are fictional.
 
-For faster application development, run PostgreSQL in Docker and the applications on the host:
+For faster application development, run the backing services in Docker and the applications on the host. The `compose.integration.yaml` overlay publishes PostgreSQL and OPA on loopback-only ports (`127.0.0.1:15432`, `127.0.0.1:18181`) so host processes can reach them without clashing with a locally installed PostgreSQL:
 
 ```powershell
-docker compose up -d postgres db-bootstrap migrate keycloak-postgres keycloak opa
+docker compose -f compose.yaml -f compose.integration.yaml up -d postgres db-bootstrap migrate seed keycloak-postgres keycloak opa
 uv run --package kribu-api uvicorn app.main:app --app-dir services/api --reload
 pnpm dev:web
 ```
 
-Run the focused scaffold checks:
+Run the checks (CI runs the same three groups on every push and pull request):
 
 ```powershell
-pnpm check
+pnpm check              # web lint + types, API ruff + mypy + unit tests
+pnpm test:policy        # OPA policy tests
 pnpm build:web
 docker compose config --quiet
 ```
+
+### Integration tests
+
+The integration suite runs the real API in-process against PostgreSQL (RLS, grants, audit) and OPA. Each run creates and drops its own `kribu_integration` database, applies migrations, and seeds demo data; tokens are signed locally, so Keycloak is not needed.
+
+```powershell
+docker compose -f compose.yaml -f compose.integration.yaml up -d postgres db-bootstrap opa
+pnpm test:integration
+```
+
+Override the endpoints with `KRIBU_TEST_OWNER_DATABASE_URL`, `KRIBU_TEST_APP_DB_PASSWORD`, and `KRIBU_TEST_OPA_URL` when they differ from the compose defaults.
 
 ## Current status
 
