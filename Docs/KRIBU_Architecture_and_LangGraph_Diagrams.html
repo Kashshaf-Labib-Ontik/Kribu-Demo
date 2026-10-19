@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>KRIBU Architecture and LangGraph Workflow</title>
+  <style>
+    @page { size: A4 landscape; margin: 8mm 10mm 8mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #182238; background: #e9edf5; font: 9.2pt/1.35 "Segoe UI", Arial, sans-serif; }
+    .page {
+      position: relative; width: 277mm; min-height: 193mm; margin: 10px auto;
+      padding: 9mm 10mm 8mm; overflow: hidden; background: white;
+      page-break-after: always; break-after: page;
+    }
+    .page:last-of-type { page-break-after: auto; break-after: auto; }
+    .cover { display: flex; flex-direction: column; justify-content: center; padding: 16mm 22mm 13mm; }
+    .cover::before { content: ""; position: absolute; inset: 0 0 auto; height: 11mm; background: linear-gradient(90deg,#363aa2,#5b5ee8,#27a6a1); }
+    .eyebrow { color: #5357c8; font-size: 9pt; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { margin: 5mm 0 3mm; color: #10182b; font-size: 30pt; line-height: 1.05; letter-spacing: -.025em; }
+    h2 { margin: 0 0 2.5mm; color: #171f36; font-size: 18pt; line-height: 1.12; }
+    h3 { margin: 0 0 1.5mm; color: #27324c; font-size: 10.5pt; }
+    p { margin: 0 0 2mm; }
+    ul, ol { margin: 1.5mm 0 0 5mm; padding: 0; }
+    li { margin: .7mm 0; }
+    code { padding: .2mm 1mm; border-radius: 3px; background: #f1f3f8; color: #393dab; }
+    .subtitle { max-width: 210mm; color: #536078; font-size: 14pt; line-height: 1.4; }
+    .callout { margin-top: 5mm; padding: 4mm; border-left: 4px solid #5b5ee8; border-radius: 4px; background: #f1f2ff; font-size: 11pt; }
+    .meta { margin-top: 6mm; color: #68728a; font-size: 9pt; }
+    .section-head { display: flex; align-items: end; justify-content: space-between; margin-bottom: 2.3mm; border-bottom: 2px solid #e1e5ef; padding-bottom: 2mm; }
+    .section-head p { margin: 0; max-width: 145mm; color: #69738b; text-align: right; }
+    .diagram-wrap { height: 116mm; border: 1px solid #dfe4ef; border-radius: 7px; background: linear-gradient(180deg,#fcfdff,#f8faff); padding: 2mm; }
+    .diagram-wrap.compact { height: 104mm; }
+    .diagram { width: 100%; height: 100%; display: block; }
+    .explain-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 3mm; margin-top: 3mm; }
+    .explain-grid.two { grid-template-columns: repeat(2,1fr); }
+    .note { padding: 2.4mm 3mm; border: 1px solid #e0e4ee; border-radius: 6px; background: #fafbfe; }
+    .note strong { color: #3539a0; }
+    .warning { border-left: 3px solid #e17b45; background: #fff6ef; }
+    .success { border-left: 3px solid #29906f; background: #f0faf6; }
+    .footer { position: absolute; right: 10mm; bottom: 3.5mm; left: 10mm; display: flex; justify-content: space-between; color: #7b8498; font-size: 7.5pt; }
+    .legend { display: flex; flex-wrap: wrap; gap: 2mm 5mm; margin: 4mm 0; }
+    .legend-item { display: flex; align-items: center; gap: 1.5mm; }
+    .swatch { width: 7mm; height: 4mm; border: 1px solid; border-radius: 2px; }
+    .toc { display: grid; grid-template-columns: repeat(3,1fr); gap: 2mm 4mm; margin-top: 3mm; }
+    .toc div { padding: 2mm 2.5mm; border-radius: 6px; background: #f7f8fc; }
+    .toc b { display: inline-block; width: 8mm; color: #5559ca; }
+    .component-table { width: 100%; border-collapse: collapse; margin-top: 3mm; font-size: 8.5pt; }
+    .component-table th, .component-table td { border: 1px solid #dfe4ee; padding: 2mm 2.3mm; vertical-align: top; }
+    .component-table th { color: #34389f; background: #eef0ff; text-align: left; }
+    @media print {
+      body { background: white; }
+      .page { margin: 0; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <section class="page cover">
+    <div class="eyebrow">KRIBU Engineering Architecture</div>
+    <h1>High-Level Architecture<br>and LangGraph Workflow</h1>
+    <p class="subtitle">A unified, industry-neutral explanation of how data enters KRIBU, how authorization constrains retrieval, how the AI Engine reasons over evidence, and how approved actions return to client systems.</p>
+    <div class="callout"><strong>Core rule:</strong> relevance and authorization are separate. KRIBU Guard decides what a user may access; KRIBU Brain searches only inside that authorized scope; KRIBU Engine reasons only over the resulting evidence.</div>
+    <div class="legend">
+      <div class="legend-item"><span class="swatch" style="background:#eef0ff;border-color:#666bd4"></span> KRIBU component</div>
+      <div class="legend-item"><span class="swatch" style="background:#ecf8f6;border-color:#41a89d"></span> LangGraph subgraph</div>
+      <div class="legend-item"><span class="swatch" style="background:#eaf4ff;border-color:#5598ce"></span> External actor/system</div>
+      <div class="legend-item"><span class="swatch" style="background:#f5f6f9;border-color:#8892a8"></span> Data store</div>
+      <div class="legend-item"><span class="swatch" style="background:#fff3e9;border-color:#df884f"></span> Decision or security gate</div>
+    </div>
+    <div class="toc">
+      <div><b>01</b> Full platform architecture</div><div><b>02</b> Industry-neutral data adaptation</div><div><b>03</b> User query to response</div>
+      <div><b>04</b> Authorization-aware retrieval</div><div><b>05</b> AI Engine internals</div><div><b>06</b> Parent LangGraph workflow</div>
+      <div><b>07</b> Retrieval subgraph</div><div><b>08</b> Analysis subgraph</div><div><b>09</b> Citation and quality subgraph</div>
+      <div><b>10</b> Approval and action subgraph</div><div><b>11</b> Persistence, streaming and recovery</div><div><b>12</b> Component reference</div>
+    </div>
+    <p class="meta">Prepared for KRIBU · 16 October 2026 · Architecture target, not a claim of implemented functionality</p>
+    <div class="footer"><span>KRIBU Architecture and LangGraph Workflow</span><span>Cover</span></div>
+  </section>
+
+  <section class="page">
+    <div class="section-head"><div><div class="eyebrow">Figure 1</div><h2>Full KRIBU Platform Dataflow</h2></div><p>The stable product components and the major synchronous, asynchronous, data, approval and audit flows.</p></div>
+    <div class="diagram-wrap"><svg class="diagram" data-diagram="platform"></svg></div>
+    <div class="explain-grid">
+      <div class="note"><strong>Front door.</strong> Users work in Studio. Gateway authenticates, rate-limits and streams. Guard creates an authorization scope before Engine or Brain can access business data.</div>
+      <div class="note"><strong>Intelligence path.</strong> Engine loads a versioned Skill, requests permission-filtered evidence from Brain, calls models through the Model Gateway, and validates citations.</div>
+      <div class="note"><strong>Controlled action.</strong> Side effects move through Actions and human approval before Connect can call an external system. Observe receives audit events throughout.</div>
+    </div>
+    <div class="footer"><span>High-level architecture</span><span>1 / 12</span></div>
+  </section>
+
+  <section class="page">
+    <div class="section-head"><div><div class="eyebrow">Figure 2</div><h2>Industry-Neutral Data Adaptation</h2></div><p>Different database schemas are absorbed by adapters and mappings; core KRIBU contracts remain stable.</p></div>
+    <div class="diagram-wrap compact"><svg class="diagram" data-diagram="generic"></svg></div>
+    <div class="explain-grid">
+      <div class="note"><strong>Preserve source truth.</strong> Original files and records remain versioned in the Source Vault. Mapping never destroys the source representation.</div>
+      <div class="note"><strong>Canonical envelope.</strong> Every item receives tenant, source, resource type, timestamps, classification, ACL, relationships and provenance—even when its business fields differ.</div>
+      <div class="note"><strong>Extend without rebuilding.</strong> A new industry adds connector adapters, schema mappings, policies and Skills. It does not replace Brain or Engine.</div>
+    </div>
+    <div class="footer"><span>Schema-independent platform design</span><span>2 / 12</span></div>
+  </section>
+
+  <section class="page">
+    <div class="section-head"><div><div class="eyebrow">Figure 3</div><h2>User Query to User Response</h2></div><p>The simplest reading path through the platform for an evidence-backed question.</p></div>
+    <div class="diagram-wrap compact"><svg class="diagram" data-diagram="query"></svg></div>
+    <div class="explain-grid two">
+      <div class="note"><strong>Request phase.</strong> Studio sends the query to Gateway. Guard resolves identity, tenant, roles, attributes and document scope. Engine then chooses an approved Skill and requests evidence.</div>
+      <div class="note"><strong>Response phase.</strong> Engine interprets authorized evidence, performs deterministic calculations, validates every material citation, stores the result, and streams a safe response through Gateway.</div>
+    </div>
+    <div class="footer"><span>Question-answer path</span><span>3 / 12</span></div>
+  </section>
+
+  <section class="page">
+    <div class="section-head"><div><div class="eyebrow">Figure 4</div><h2>Authorization-Aware Retrieval</h2></div><p>Policy decides access. Vector and keyword search decide relevance only inside the allowed scope.</p></div>
+    <div class="diagram-wrap compact"><svg class="diagram" data-diagram="guard"></svg></div>
+    <div class="explain-grid">
+      <div class="note"><strong>Dynamic policies.</strong> Guard evaluates principal, action, resource, relationship, environment and policy. Rules describe resource classes—not named people.</div>
+      <div class="note"><strong>Optional semantic detector.</strong> A lightweight model can recognize synonyms, prompt injection and possible leakage. It returns a risk signal; it cannot grant permission.</div>
+      <div class="note warning"><strong>Security invariant.</strong> Unauthorized chunks never reach the reasoning model. Retrieval filters and PostgreSQL RLS enforce the decision again.</div>
+    </div>
+    <div class="footer"><span>KRIBU Guard and Brain</span><span>4 / 12</span></div>
+  </section>
+
+  <section class="page">
+    <div class="section-head"><div><div class="eyebrow">Figure 5</div><h2>Inside the KRIBU AI Engine</h2></div><p>A controlled orchestration runtime rather than a single unrestricted autonomous agent.</p></div>
+    <div class="diagram-wrap compact"><svg class="diagram" data-diagram="engine"></svg></div>
+    <div class="explain-grid">
+      <div class="note"><strong>Parent graph.</strong> Owns the run lifecycle and routes typed state between governance, retrieval, analysis, validation, artifact and action stages.</div>
+      <div class="note"><strong>Subgraphs.</strong> Reusable workflows expose typed inputs and outputs. Industry Skills configure them without changing Engine infrastructure.</div>
+      <div class="note"><strong>Runtime services.</strong> Checkpoints, model adapters, safe event streaming, retries and audit hooks support long-running and resumable execution.</div>
+    </div>
+    <div class="footer"><span>AI Engine component view</span><span>5 / 12</span></div>
+  </section>
+
+  <section class="page">
+    <div class="section-head"><div><div class="eyebrow">Figure 6</div><h2>Parent LangGraph Workflow</h2></div><p>The complete run from validated request to final answer or approved external action.</p></div>
+    <div class="diagram-wrap"><svg class="diagram" data-diagram="parent"></svg></div>
+    <div class="explain-grid">
+      <div class="note"><strong>Deterministic gates.</strong> Request validation, authorization, calculations, citation integrity, retry limits and action policy are code-driven.</div>
+      <div class="note"><strong>Model-assisted stages.</strong> Intent classification, extraction and synthesis use typed model outputs and cannot override Guard.</div>
+      <div class="note"><strong>Safe exits.</strong> Missing evidence returns a limitation. Sensitive actions pause for approval. Rejection and failure remain valid audited outcomes.</div>
+    </div>
+    <div class="footer"><span>LangGraph parent state machine</span><span>6 / 12</span></div>
+  </section>
+
+  <section class="page">
+    <div class="section-head"><div><div class="eyebrow">Figure 7</div><h2>Retrieval Subgraph</h2></div><p>Parallel retrieval modes are fused, reranked, permission-checked and expanded into exact evidence.</p></div>
+    <div class="diagram-wrap compact"><svg class="diagram" data-diagram="retrieval"></svg></div>
+    <div class="explain-grid">
+      <div class="note"><strong>Parallel discovery.</strong> Keyword, vector, metadata and structured-fact searches answer different aspects of the query.</div>
+      <div class="note"><strong>Permission preservation.</strong> AccessScope is applied during the query and rechecked before exact source windows are returned.</div>
+      <div class="note"><strong>Output.</strong> The subgraph returns <code>EvidenceRef</code> objects containing document version, page/cell, excerpt, score and provenance.</div>
+    </div>
+    <div class="footer"><span>Permission-filtered evidence retrieval</span><span>7 / 12</span></div>
+  </section>
+
+  <section class="page">
+    <div class="section-head"><div><div class="eyebrow">Figure 8</div><h2>Analysis Subgraph</h2></div><p>Typed extraction fans out across evidence, then deterministic normalization and comparison produce findings.</p></div>
+    <div class="diagram-wrap compact"><svg class="diagram" data-diagram="analysis"></svg></div>
+    <div class="explain-grid">
+      <div class="note"><strong>Skill-dependent extractors.</strong> Project milestones, quotation terms, complaint categories or employee facts are configured by the selected Skill.</div>
+      <div class="note"><strong>Code owns arithmetic.</strong> Variances, dates, totals and thresholds are calculated with deterministic code—not guessed by the model.</div>
+      <div class="note"><strong>Finding contract.</strong> Every finding carries category, severity, confidence, limitations, inference level and evidence references.</div>
+    </div>
+    <div class="footer"><span>Evidence-to-finding transformation</span><span>8 / 12</span></div>
+  </section>
+
+  <section class="page">
+    <div class="section-head"><div><div class="eyebrow">Figure 9</div><h2>Citation and Quality Subgraph</h2></div><p>Before presentation, findings are checked against exact source locations and deterministic calculations.</p></div>
+    <div class="diagram-wrap compact"><svg class="diagram" data-diagram="quality"></svg></div>
+    <div class="explain-grid">
+      <div class="note"><strong>Mechanical validation.</strong> Document versions, ACL scope, page/cell references and calculations are verified in code.</div>
+      <div class="note"><strong>Semantic support.</strong> A constrained evaluator checks whether the cited excerpt actually supports the claim and flags unsupported causality.</div>
+      <div class="note"><strong>Repair loop.</strong> Failed claims create targeted retrieval requests. After a bounded retry limit, KRIBU returns an explicit limitation.</div>
+    </div>
+    <div class="footer"><span>Grounding and quality gate</span><span>9 / 12</span></div>
+  </section>
+
+  <section class="page">
+    <div class="section-head"><div><div class="eyebrow">Figure 10</div><h2>Approval and Action Subgraph</h2></div><p>Emails, tasks and record changes remain proposals until policy and human approval permit execution.</p></div>
+    <div class="diagram-wrap compact"><svg class="diagram" data-diagram="approval"></svg></div>
+    <div class="explain-grid">
+      <div class="note"><strong>Interrupt before effect.</strong> LangGraph checkpoints the run and pauses before any external write. The interrupted node may safely resume later.</div>
+      <div class="note"><strong>Revalidation.</strong> Edited actions are checked again for permission, recipient, classification and schema before execution.</div>
+      <div class="note warning"><strong>Idempotency.</strong> Every outbound action uses a stable idempotency key so retries cannot send or create the same item twice.</div>
+    </div>
+    <div class="footer"><span>Human-controlled side effects</span><span>10 / 12</span></div>
+  </section>
+
+  <section class="page">
+    <div class="section-head"><div><div class="eyebrow">Figure 11</div><h2>Persistence, Streaming and Recovery</h2></div><p>Graph state survives restarts and long waits; business knowledge remains separate from execution memory.</p></div>
+    <div class="diagram-wrap compact"><svg class="diagram" data-diagram="runtime"></svg></div>
+    <div class="explain-grid">
+      <div class="note"><strong>Checkpoint state.</strong> PostgreSQL stores small serializable run state keyed by tenant and run. Large documents stay in Brain and the Source Vault.</div>
+      <div class="note"><strong>User visibility.</strong> Gateway streams safe milestones such as retrieval completed, approval requested and run completed—never hidden prompts or unauthorized excerpts.</div>
+      <div class="note"><strong>Failure handling.</strong> Transient operations retry with limits; repeated failures enter a dead-letter path and produce an auditable recoverable status.</div>
+    </div>
+    <div class="footer"><span>Durable Engine runtime</span><span>11 / 12</span></div>
+  </section>
+
+  <section class="page">
+    <div class="section-head"><div><div class="eyebrow">Reference</div><h2>Component Responsibilities and Boundaries</h2></div><p>The concise contract for reading every figure in this document.</p></div>
+    <table class="component-table">
+      <thead><tr><th style="width:19%">Component</th><th style="width:45%">Primary responsibility</th><th>Must never do</th></tr></thead>
+      <tbody>
+        <tr><td><strong>KRIBU Studio</strong></td><td>User workspace, source review, approvals, Skill Studio and administration.</td><td>Bypass Gateway or expose hidden Engine state.</td></tr>
+        <tr><td><strong>KRIBU Gateway</strong></td><td>API boundary, tenant context, validation, throttling and safe SSE streaming.</td><td>Make domain findings or authorize data by itself.</td></tr>
+        <tr><td><strong>KRIBU Guard</strong></td><td>Identity, RBAC, ABAC/ReBAC, resource classification, AccessScope and action policy.</td><td>Use an LLM as the final authorization authority.</td></tr>
+        <tr><td><strong>KRIBU Connect</strong></td><td>Schema-specific adapters, sync, webhooks, uploads and approved outbound actions.</td><td>Execute an unapproved side effect or erase source provenance.</td></tr>
+        <tr><td><strong>KRIBU Brain</strong></td><td>Source versions, canonical resources, chunks, facts, relationships, embeddings and provenance.</td><td>Return evidence outside Guard's scope.</td></tr>
+        <tr><td><strong>KRIBU Engine</strong></td><td>LangGraph orchestration, evidence analysis, deterministic calculations, validation and artifact generation.</td><td>Grant access, invent evidence or directly execute sensitive actions.</td></tr>
+        <tr><td><strong>KRIBU Skills</strong></td><td>Versioned workflow configuration, typed schemas, permissions, prompts, tools and test datasets.</td><td>Self-modify or publish without evaluation and review.</td></tr>
+        <tr><td><strong>KRIBU Actions</strong></td><td>Approval requests, decision capture, revalidation and idempotent execution commands.</td><td>Treat model intent as approval.</td></tr>
+        <tr><td><strong>KRIBU Observe</strong></td><td>Audit, traces, costs, quality evaluations, operational metrics and exports.</td><td>Become the source of business authorization.</td></tr>
+      </tbody>
+    </table>
+    <div class="explain-grid two" style="margin-top:4mm">
+      <div class="note success"><strong>Stable core.</strong> New industries extend Connector mappings, classification vocabularies, policies and Skills. The core component boundaries and evidence contracts remain unchanged.</div>
+      <div class="note warning"><strong>Trust boundary.</strong> Source documents and external records are untrusted input. They may supply evidence, but they cannot change policies, select permissions or authorize tools.</div>
+    </div>
+    <div class="footer"><span>Architecture reference</span><span>12 / 12</span></div>
+  </section>
+
+  <script>
+  (() => {
+    const NS = 'http://www.w3.org/2000/svg';
+    const palettes = {
+      box: ['#eef0ff','#666bd4'], external: ['#eaf4ff','#5598ce'], subgraph: ['#ecf8f6','#41a89d'],
+      decision: ['#fff3e9','#df884f'], store: ['#f5f6f9','#8892a8'], start: ['#eff9f3','#4d9b75'],
+      danger: ['#fff0ee','#d66c5d'], dark: ['#29324d','#29324d']
+    };
+    function add(parent, tag, attrs={}) { const el=document.createElementNS(NS,tag); Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,v)); parent.appendChild(el); return el; }
+    function anchor(n, side) { if(side==='left')return[n.x,n.y+n.h/2]; if(side==='right')return[n.x+n.w,n.y+n.h/2]; if(side==='top')return[n.x+n.w/2,n.y]; return[n.x+n.w/2,n.y+n.h]; }
+    function nodeShape(svg,n) {
+      const [fill,stroke]=palettes[n.type||'box']; const g=add(svg,'g');
+      if(n.type==='decision') {
+        add(g,'polygon',{points:`${n.x+n.w/2},${n.y} ${n.x+n.w},${n.y+n.h/2} ${n.x+n.w/2},${n.y+n.h} ${n.x},${n.y+n.h/2}`,fill,stroke,'stroke-width':2});
+      } else if(n.type==='store') {
+        add(g,'rect',{x:n.x,y:n.y,width:n.w,height:n.h,rx:14,fill,stroke,'stroke-width':2});
+        add(g,'path',{d:`M ${n.x} ${n.y+11} Q ${n.x+n.w/2} ${n.y+22} ${n.x+n.w} ${n.y+11}`,fill:'none',stroke,'stroke-width':1.4});
+      } else {
+        add(g,'rect',{x:n.x,y:n.y,width:n.w,height:n.h,rx:n.type==='start'?22:10,fill,stroke,'stroke-width':n.type==='subgraph'?2.2:2,'stroke-dasharray':n.type==='subgraph'?'7 4':'none'});
+      }
+      const lines=(n.label||'').split('\n'); const lineH=n.font||14; const startY=n.y+n.h/2-((lines.length-1)*lineH)/2+4;
+      lines.forEach((line,i)=>{ const t=add(g,'text',{x:n.x+n.w/2,y:startY+i*lineH,'text-anchor':'middle','font-family':'Segoe UI,Arial','font-size':n.font||13,'font-weight':i===0&&n.bold!==false?700:500,fill:n.type==='dark'?'#fff':'#202940'}); t.textContent=line; });
+    }
+    function edgeShape(svg,e,map) {
+      const a=anchor(map[e.from],e.fromSide||'right'), b=anchor(map[e.to],e.toSide||'left'); const pts=[a,...(e.via||[]),b];
+      const d=pts.map((p,i)=>(i?'L':'M')+` ${p[0]} ${p[1]}`).join(' '); add(svg,'path',{d,fill:'none',stroke:e.color||'#68738a','stroke-width':e.width||1.8,'stroke-dasharray':e.dashed?'6 4':'none','marker-end':'url(#arrow)'});
+      if(e.label){ const lx=e.lx??(a[0]+b[0])/2, ly=e.ly??(a[1]+b[1])/2-5; const bg=add(svg,'rect',{x:lx-35,y:ly-12,width:70,height:17,rx:4,fill:'#fff','fill-opacity':.92}); const t=add(svg,'text',{x:lx,y:ly,'text-anchor':'middle','font-family':'Segoe UI,Arial','font-size':10.5,'font-weight':600,fill:e.color||'#566178'}); t.textContent=e.label; }
+    }
+    function render(svg,spec) {
+      svg.setAttribute('viewBox',`0 0 ${spec.w} ${spec.h}`); svg.setAttribute('role','img'); svg.setAttribute('aria-label',spec.title||'KRIBU diagram');
+      const defs=add(svg,'defs'); const marker=add(defs,'marker',{id:'arrow',viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:7,markerHeight:7,orient:'auto-start-reverse'}); add(marker,'path',{d:'M 0 0 L 10 5 L 0 10 z',fill:'#68738a'});
+      (spec.groups||[]).forEach(g=>{ add(svg,'rect',{x:g.x,y:g.y,width:g.w,height:g.h,rx:14,fill:g.fill||'#fbfcff',stroke:g.stroke||'#cdd4e2','stroke-width':1.5,'stroke-dasharray':g.dashed?'8 5':'none'}); const t=add(svg,'text',{x:g.x+12,y:g.y+20,'font-family':'Segoe UI,Arial','font-size':12,'font-weight':800,fill:g.color||'#69738a'}); t.textContent=g.label; });
+      const map=Object.fromEntries(spec.nodes.map(n=>[n.id,n])); (spec.edges||[]).forEach(e=>edgeShape(svg,e,map)); spec.nodes.forEach(n=>nodeShape(svg,n));
+    }
+    const specs = {
+      platform:{w:1160,h:520,title:'Full KRIBU platform dataflow',groups:[{x:170,y:25,w:815,h:455,label:'KRIBU PLATFORM — governed tenant boundary',fill:'#fbfbff',stroke:'#8c90db'}],nodes:[
+        {id:'user',x:15,y:60,w:125,h:52,label:'Employees /\nManagers',type:'external'},{id:'approver',x:15,y:145,w:125,h:52,label:'Business\nApprovers',type:'external'},{id:'systems',x:15,y:345,w:125,h:60,label:'ERP / CRM / Drive\nEmail / HRIS / APIs',type:'external'},{id:'idp',x:15,y:440,w:125,h:48,label:'Enterprise IdP',type:'external'},
+        {id:'studio',x:205,y:65,w:135,h:54,label:'KRIBU Studio'},{id:'gateway',x:390,y:65,w:135,h:54,label:'KRIBU Gateway'},{id:'guard',x:575,y:65,w:135,h:54,label:'KRIBU Guard'},{id:'skills',x:800,y:55,w:145,h:54,label:'KRIBU Skills'},
+        {id:'engine',x:565,y:205,w:155,h:62,label:'KRIBU Engine\nLangGraph',type:'subgraph'},{id:'brain',x:335,y:205,w:150,h:62,label:'KRIBU Brain'},{id:'models',x:795,y:205,w:155,h:62,label:'Model Gateway',type:'external'},
+        {id:'connect',x:230,y:345,w:145,h:58,label:'KRIBU Connect'},{id:'actions',x:790,y:345,w:155,h:58,label:'KRIBU Actions'},{id:'observe',x:560,y:407,w:160,h:54,label:'KRIBU Observe'},
+        {id:'source',x:400,y:345,w:130,h:58,label:'Source / Artifact\nVault',type:'store'},{id:'brainstore',x:400,y:430,w:130,h:58,label:'PostgreSQL +\npgvector',type:'store'},{id:'state',x:735,y:430,w:130,h:58,label:'Run Checkpoints',type:'store'},
+        {id:'audit',x:1005,y:420,w:135,h:58,label:'Audit / Eval\nStore',type:'store'}],edges:[
+        {from:'user',to:'studio'},{from:'approver',to:'studio'},{from:'studio',to:'gateway'},{from:'gateway',to:'guard'},{from:'guard',to:'engine',fromSide:'bottom',toSide:'top'},{from:'engine',to:'skills',fromSide:'top',toSide:'bottom'},{from:'engine',to:'brain',fromSide:'left',toSide:'right',label:'evidence',lx:525,ly:225},{from:'engine',to:'models',label:'typed calls',lx:756,ly:225},
+        {from:'systems',to:'connect'},{from:'connect',to:'source'},{from:'connect',to:'brain',fromSide:'top',toSide:'bottom',via:[[302,300],[410,300]]},{from:'brain',to:'brainstore',fromSide:'bottom',toSide:'top'},{from:'engine',to:'state',fromSide:'bottom',toSide:'top',via:[[642,310],[800,310]]},{from:'engine',to:'actions',fromSide:'bottom',toSide:'top',label:'proposal',lx:756,ly:305},{from:'actions',to:'studio',fromSide:'top',toSide:'bottom',via:[[868,150],[270,150]],label:'approval',lx:565,ly:142},{from:'actions',to:'connect',fromSide:'left',toSide:'right',label:'approved only',lx:582,ly:365},{from:'gateway',to:'idp',fromSide:'left',toSide:'right',via:[[365,92],[365,464]],label:'OIDC',lx:365,ly:290},
+        {from:'gateway',to:'observe',fromSide:'bottom',toSide:'top',dashed:true},{from:'guard',to:'observe',fromSide:'bottom',toSide:'top',dashed:true},{from:'engine',to:'observe',fromSide:'bottom',toSide:'top',dashed:true},{from:'actions',to:'observe',fromSide:'bottom',toSide:'right',dashed:true},{from:'observe',to:'audit',dashed:true}]},
+      generic:{w:1160,h:430,title:'Industry-neutral data adaptation',groups:[{x:15,y:45,w:200,h:330,label:'CLIENT-SPECIFIC',fill:'#f4f9ff',stroke:'#70a6ce'},{x:245,y:45,w:675,h:330,label:'STABLE KRIBU CORE',fill:'#fbfbff',stroke:'#8c90db'},{x:950,y:45,w:190,h:330,label:'CONFIGURATION',fill:'#f5fbf9',stroke:'#61aa9f'}],nodes:[
+        {id:'db',x:40,y:95,w:150,h:48,label:'Databases',type:'external'},{id:'docs',x:40,y:175,w:150,h:48,label:'Documents / Email',type:'external'},{id:'apis',x:40,y:255,w:150,h:48,label:'SaaS / APIs',type:'external'},
+        {id:'adapter',x:270,y:85,w:150,h:58,label:'Connector\nAdapters'},{id:'mapping',x:460,y:85,w:150,h:58,label:'Schema Mapping\nand Validation'},{id:'envelope',x:650,y:85,w:190,h:58,label:'Canonical Resource\nEnvelope'},
+        {id:'vault',x:290,y:250,w:145,h:58,label:'Original Source\nVault',type:'store'},{id:'class',x:470,y:250,w:150,h:58,label:'Classification +\nACL Metadata'},{id:'brain',x:670,y:250,w:150,h:58,label:'KRIBU Brain'},
+        {id:'schemas',x:975,y:85,w:140,h:50,label:'Mapping Registry',type:'store'},{id:'policies',x:975,y:175,w:140,h:50,label:'Policy Registry',type:'store'},{id:'skills',x:975,y:265,w:140,h:50,label:'Industry Skills',type:'store'}],edges:[
+        {from:'db',to:'adapter'},{from:'docs',to:'adapter'},{from:'apis',to:'adapter'},{from:'adapter',to:'mapping'},{from:'mapping',to:'envelope'},{from:'adapter',to:'vault',fromSide:'bottom',toSide:'top'},{from:'envelope',to:'class',fromSide:'bottom',toSide:'top'},{from:'class',to:'brain'},{from:'vault',to:'brain'},{from:'schemas',to:'mapping',fromSide:'left',toSide:'right',dashed:true},{from:'policies',to:'class',fromSide:'left',toSide:'right',dashed:true},{from:'skills',to:'brain',fromSide:'left',toSide:'right',dashed:true}]},
+      query:{w:1160,h:410,title:'User query to response',nodes:[
+        {id:'user',x:15,y:145,w:105,h:54,label:'User',type:'external'},{id:'studio',x:150,y:145,w:125,h:54,label:'Studio'},{id:'gateway',x:305,y:145,w:125,h:54,label:'Gateway'},{id:'guard',x:460,y:145,w:125,h:54,label:'Guard'},{id:'engine',x:625,y:135,w:145,h:72,label:'Engine\nLangGraph',type:'subgraph'},{id:'validate',x:985,y:145,w:150,h:54,label:'Citation + Result\nValidation'},
+        {id:'skills',x:625,y:20,w:145,h:54,label:'Skills'},{id:'brain',x:795,y:250,w:145,h:58,label:'Brain Evidence'},{id:'model',x:795,y:50,w:145,h:58,label:'Model Provider',type:'external'},{id:'observe',x:500,y:320,w:160,h:54,label:'Observe',type:'store'}],edges:[
+        {from:'user',to:'studio',label:'query',lx:135,ly:135},{from:'studio',to:'gateway'},{from:'gateway',to:'guard'},{from:'guard',to:'engine'},{from:'engine',to:'skills',fromSide:'top',toSide:'bottom'},{from:'engine',to:'brain',fromSide:'bottom',toSide:'left',via:[[697,279]]},{from:'engine',to:'model',fromSide:'top',toSide:'left',via:[[697,79]]},{from:'engine',to:'validate'},{from:'validate',to:'studio',fromSide:'top',toSide:'top',via:[[1060,100],[212,100]],label:'streamed response',lx:620,ly:92},{from:'gateway',to:'observe',fromSide:'bottom',toSide:'top',dashed:true},{from:'engine',to:'observe',fromSide:'bottom',toSide:'top',dashed:true},{from:'validate',to:'observe',fromSide:'bottom',toSide:'right',dashed:true}]},
+      guard:{w:1160,h:430,title:'Authorization-aware retrieval',nodes:[
+        {id:'query',x:15,y:175,w:130,h:54,label:'Natural-language\nQuery',type:'external'},{id:'semantic',x:180,y:75,w:155,h:58,label:'Optional Semantic\nRisk Detector',type:'subgraph'},{id:'resolve',x:180,y:175,w:155,h:58,label:'Resource + Action\nResolver'},{id:'attrs',x:180,y:290,w:155,h:58,label:'Identity / Source\nAttributes',type:'store'},
+        {id:'pdp',x:390,y:165,w:165,h:72,label:'Policy Decision Point\nRBAC + ABAC + ReBAC'},{id:'allow',x:605,y:170,w:115,h:64,label:'Allowed?',type:'decision'},{id:'deny',x:770,y:300,w:150,h:54,label:'Safe Denial',type:'danger'},{id:'scope',x:770,y:80,w:150,h:58,label:'AccessScope'},{id:'search',x:965,y:70,w:170,h:74,label:'Brain Search\nVector + Keyword'},{id:'engine',x:965,y:230,w:170,h:62,label:'Authorized Evidence\nto Engine',type:'subgraph'},{id:'output',x:770,y:200,w:150,h:58,label:'Output Leakage\nScanner',type:'subgraph'}],edges:[
+        {from:'query',to:'resolve'},{from:'query',to:'semantic',fromSide:'top',toSide:'left',dashed:true},{from:'semantic',to:'pdp',fromSide:'right',toSide:'top',dashed:true,label:'risk signal',lx:380,ly:95},{from:'resolve',to:'pdp'},{from:'attrs',to:'pdp',fromSide:'right',toSide:'bottom'},{from:'pdp',to:'allow'},{from:'allow',to:'deny',fromSide:'bottom',toSide:'left',label:'No',lx:730,ly:310},{from:'allow',to:'scope',fromSide:'top',toSide:'left',label:'Yes',lx:735,ly:90},{from:'scope',to:'search'},{from:'search',to:'engine',fromSide:'bottom',toSide:'top'},{from:'engine',to:'output',fromSide:'left',toSide:'right'},{from:'output',to:'deny',fromSide:'bottom',toSide:'top',label:'leak found',lx:845,ly:280}]},
+      engine:{w:1160,h:420,title:'Inside KRIBU AI Engine',groups:[{x:20,y:35,w:1120,h:340,label:'KRIBU AI ENGINE',fill:'#fbfbff',stroke:'#8c90db'}],nodes:[
+        {id:'parent',x:430,y:70,w:300,h:64,label:'Parent StateGraph\nTyped run lifecycle',type:'subgraph'},
+        {id:'retr',x:70,y:190,w:180,h:64,label:'Retrieval\nSubgraph',type:'subgraph'},{id:'anal',x:285,y:190,w:180,h:64,label:'Analysis\nSubgraph',type:'subgraph'},{id:'qual',x:500,y:190,w:180,h:64,label:'Citation / Quality\nSubgraph',type:'subgraph'},{id:'act',x:715,y:190,w:180,h:64,label:'Approval / Action\nSubgraph',type:'subgraph'},{id:'artifact',x:930,y:190,w:160,h:64,label:'Artifact\nGenerator'},
+        {id:'checkpoint',x:75,y:310,w:175,h:50,label:'Checkpoint Manager',type:'store'},{id:'model',x:300,y:310,w:175,h:50,label:'Model Gateway',type:'external'},{id:'events',x:525,y:310,w:175,h:50,label:'Safe Event Streamer'},{id:'retry',x:750,y:310,w:175,h:50,label:'Retry / Recovery'},{id:'audit',x:970,y:310,w:120,h:50,label:'Audit Hooks'}],edges:[
+        {from:'parent',to:'retr',fromSide:'bottom',toSide:'top'},{from:'parent',to:'anal',fromSide:'bottom',toSide:'top'},{from:'parent',to:'qual',fromSide:'bottom',toSide:'top'},{from:'parent',to:'act',fromSide:'bottom',toSide:'top'},{from:'parent',to:'artifact',fromSide:'bottom',toSide:'top'},{from:'checkpoint',to:'parent',fromSide:'top',toSide:'left',dashed:true},{from:'model',to:'parent',fromSide:'top',toSide:'bottom',dashed:true},{from:'parent',to:'events',fromSide:'bottom',toSide:'top',dashed:true},{from:'retry',to:'parent',fromSide:'top',toSide:'right',dashed:true},{from:'parent',to:'audit',fromSide:'right',toSide:'top',dashed:true}]},
+      parent:{w:1160,h:540,title:'Parent LangGraph workflow',nodes:[
+        {id:'start',x:15,y:25,w:125,h:45,label:'START\nUser query',type:'start'},{id:'validate',x:175,y:20,w:135,h:54,label:'Validate\nrequest'},{id:'auth',x:350,y:20,w:160,h:54,label:'Authorize +\nAccessScope'},{id:'authorized',x:550,y:20,w:120,h:58,label:'Authorized?',type:'decision'},{id:'intent',x:715,y:20,w:130,h:54,label:'Classify intent'},{id:'skill',x:885,y:20,w:135,h:54,label:'Load Skill'},{id:'plan',x:1045,y:20,w:100,h:54,label:'Build plan'},
+        {id:'retr',x:930,y:135,w:175,h:58,label:'Retrieval Subgraph',type:'subgraph'},{id:'enough',x:735,y:130,w:135,h:68,label:'Enough\nevidence?',type:'decision'},{id:'clarify',x:535,y:135,w:145,h:54,label:'Ask clarification'},{id:'limit',x:350,y:135,w:145,h:54,label:'Evidence limitation',type:'danger'},
+        {id:'analysis',x:735,y:260,w:175,h:58,label:'Analysis Subgraph',type:'subgraph'},{id:'quality',x:505,y:260,w:185,h:58,label:'Citation + Quality\nSubgraph',type:'subgraph'},{id:'pass',x:315,y:255,w:135,h:68,label:'Quality\npassed?',type:'decision'},{id:'retry',x:125,y:255,w:135,h:68,label:'Retry budget?',type:'decision'},
+        {id:'artifact',x:315,y:390,w:155,h:58,label:'Generate answer /\nartifact'},{id:'actionq',x:515,y:385,w:145,h:68,label:'External\naction?',type:'decision'},{id:'approval',x:705,y:390,w:190,h:58,label:'Approval + Action\nSubgraph',type:'subgraph'},{id:'save',x:940,y:390,w:145,h:58,label:'Persist result'},{id:'end',x:940,y:485,w:145,h:45,label:'END\nStream response',type:'start'}],edges:[
+        {from:'start',to:'validate'},{from:'validate',to:'auth'},{from:'auth',to:'authorized'},{from:'authorized',to:'intent',label:'Yes',lx:690,ly:15},{from:'authorized',to:'limit',fromSide:'bottom',toSide:'top',label:'No',lx:520,ly:105},{from:'intent',to:'skill'},{from:'skill',to:'plan'},{from:'plan',to:'retr',fromSide:'bottom',toSide:'top'},{from:'retr',to:'enough',fromSide:'left',toSide:'right'},{from:'enough',to:'analysis',fromSide:'bottom',toSide:'top',label:'Yes',lx:803,ly:225},{from:'enough',to:'clarify',fromSide:'left',toSide:'right',label:'Need input',lx:705,ly:125},{from:'clarify',to:'retr',fromSide:'top',toSide:'left',via:[[607,105],[930,105]],label:'resume',lx:775,ly:98},{from:'enough',to:'limit',fromSide:'left',toSide:'right',via:[[520,164]],label:'Unavailable',lx:515,ly:155},
+        {from:'analysis',to:'quality',fromSide:'left',toSide:'right'},{from:'quality',to:'pass',fromSide:'left',toSide:'right'},{from:'pass',to:'artifact',fromSide:'bottom',toSide:'top',label:'Yes',lx:382,ly:365},{from:'pass',to:'retry',fromSide:'left',toSide:'right',label:'No',lx:285,ly:245},{from:'retry',to:'retr',fromSide:'top',toSide:'left',via:[[192,220],[1100,220]],label:'Retry',lx:1050,ly:212},{from:'retry',to:'limit',fromSide:'top',toSide:'left',via:[[192,215],[320,215],[320,162]],label:'Stop',lx:280,ly:207},
+        {from:'artifact',to:'actionq'},{from:'actionq',to:'approval',label:'Yes',lx:680,ly:375},{from:'actionq',to:'save',fromSide:'bottom',toSide:'left',via:[[587,470],[925,470],[925,419]],label:'No',lx:755,ly:462},{from:'approval',to:'save'},{from:'limit',to:'save',fromSide:'bottom',toSide:'top',via:[[422,470],[1012,470]]},{from:'save',to:'end',fromSide:'bottom',toSide:'top'}]},
+      retrieval:{w:1160,h:420,title:'Retrieval subgraph',nodes:[
+        {id:'input',x:15,y:170,w:145,h:58,label:'Query +\nAccessScope',type:'start'},{id:'plan',x:200,y:170,w:145,h:58,label:'Build search plan'},
+        {id:'kw',x:395,y:30,w:145,h:54,label:'Keyword search'},{id:'vec',x:395,y:120,w:145,h:54,label:'Vector search'},{id:'meta',x:395,y:210,w:145,h:54,label:'Metadata search'},{id:'facts',x:395,y:300,w:145,h:54,label:'Structured facts'},
+        {id:'fuse',x:595,y:120,w:155,h:58,label:'Rank fusion'},{id:'rerank',x:790,y:120,w:145,h:58,label:'Rerank'},{id:'acl',x:790,y:240,w:145,h:58,label:'ACL + RLS\nrecheck',type:'decision'},{id:'exact',x:985,y:120,w:155,h:58,label:'Load exact pages,\ntables and cells'},{id:'out',x:985,y:270,w:155,h:58,label:'EvidenceRef[]',type:'store'}],edges:[
+        {from:'input',to:'plan'},{from:'plan',to:'kw',fromSide:'right',toSide:'left'},{from:'plan',to:'vec'},{from:'plan',to:'meta'},{from:'plan',to:'facts'},{from:'kw',to:'fuse',fromSide:'right',toSide:'left'},{from:'vec',to:'fuse'},{from:'meta',to:'fuse'},{from:'facts',to:'fuse',fromSide:'right',toSide:'left'},{from:'fuse',to:'rerank'},{from:'rerank',to:'acl',fromSide:'bottom',toSide:'top'},{from:'acl',to:'exact',fromSide:'top',toSide:'bottom'},{from:'exact',to:'out',fromSide:'bottom',toSide:'top'}]},
+      analysis:{w:1160,h:420,title:'Analysis subgraph',nodes:[
+        {id:'evidence',x:15,y:170,w:135,h:58,label:'EvidenceRef[]',type:'start'},{id:'milestones',x:205,y:25,w:160,h:54,label:'Extract domain\nfacts A',type:'subgraph'},{id:'spend',x:205,y:115,w:160,h:54,label:'Extract domain\nfacts B',type:'subgraph'},{id:'issues',x:205,y:205,w:160,h:54,label:'Extract domain\nfacts C',type:'subgraph'},{id:'dates',x:205,y:295,w:160,h:54,label:'Extract dates /\nperiods',type:'subgraph'},
+        {id:'typed',x:430,y:160,w:155,h:62,label:'Validate typed\nextraction'},{id:'norm',x:630,y:70,w:155,h:58,label:'Normalize entities\nand units'},{id:'group',x:630,y:245,w:155,h:58,label:'Group by resource\nand period'},{id:'calc',x:835,y:70,w:155,h:58,label:'Deterministic\ncalculations'},{id:'patterns',x:835,y:245,w:155,h:58,label:'Detect patterns +\ninconsistencies'},{id:'findings',x:1015,y:160,w:130,h:62,label:'Finding[]',type:'store'}],edges:[
+        {from:'evidence',to:'milestones'},{from:'evidence',to:'spend'},{from:'evidence',to:'issues'},{from:'evidence',to:'dates'},{from:'milestones',to:'typed'},{from:'spend',to:'typed'},{from:'issues',to:'typed'},{from:'dates',to:'typed'},{from:'typed',to:'norm',fromSide:'right',toSide:'left'},{from:'typed',to:'group',fromSide:'right',toSide:'left'},{from:'norm',to:'calc'},{from:'group',to:'patterns'},{from:'calc',to:'findings'},{from:'patterns',to:'findings'}]},
+      quality:{w:1160,h:420,title:'Citation and quality subgraph',nodes:[
+        {id:'findings',x:15,y:170,w:135,h:58,label:'Finding[]',type:'start'},{id:'coverage',x:195,y:55,w:165,h:58,label:'Material claim\ncoverage'},{id:'refs',x:195,y:170,w:165,h:58,label:'Version + page/cell\nreference check'},{id:'acl',x:195,y:285,w:165,h:58,label:'Authorization scope\nrecheck'},
+        {id:'reopen',x:420,y:105,w:165,h:58,label:'Reopen exact\nsource excerpts'},{id:'math',x:420,y:245,w:165,h:58,label:'Recompute\ncalculations'},{id:'support',x:640,y:105,w:175,h:58,label:'Semantic support +\ncausality check',type:'subgraph'},{id:'valid',x:650,y:255,w:135,h:70,label:'All valid?',type:'decision'},{id:'pass',x:875,y:65,w:165,h:58,label:'Approved findings',type:'store'},{id:'repair',x:875,y:250,w:165,h:58,label:'Targeted retrieval\nrequest',type:'danger'},{id:'limit',x:875,y:335,w:165,h:48,label:'Explicit limitation',type:'danger'}],edges:[
+        {from:'findings',to:'coverage'},{from:'findings',to:'refs'},{from:'findings',to:'acl'},{from:'coverage',to:'reopen'},{from:'refs',to:'reopen'},{from:'acl',to:'math'},{from:'reopen',to:'support'},{from:'math',to:'valid'},{from:'support',to:'valid',fromSide:'bottom',toSide:'top'},{from:'valid',to:'pass',fromSide:'top',toSide:'bottom',label:'Yes',lx:850,ly:85},{from:'valid',to:'repair',label:'Retry',lx:835,ly:245},{from:'repair',to:'limit',fromSide:'bottom',toSide:'top',label:'budget exhausted',lx:958,ly:326}]},
+      approval:{w:1160,h:420,title:'Approval and action subgraph',nodes:[
+        {id:'proposal',x:15,y:165,w:145,h:58,label:'Proposed action',type:'start'},{id:'schema',x:200,y:165,w:145,h:58,label:'Validate action\nschema'},{id:'policy',x:385,y:165,w:155,h:58,label:'Guard action\npolicy'},{id:'allowed',x:580,y:160,w:120,h:70,label:'Allowed?',type:'decision'},{id:'prohibited',x:750,y:300,w:145,h:54,label:'Prohibited',type:'danger'},{id:'request',x:750,y:65,w:155,h:58,label:'Create approval\nrequest'},{id:'interrupt',x:945,y:65,w:165,h:58,label:'LangGraph interrupt\n+ checkpoint',type:'subgraph'},
+        {id:'decision',x:950,y:170,w:150,h:70,label:'Human\ndecision?',type:'decision'},{id:'reject',x:950,y:300,w:150,h:54,label:'Record rejection',type:'danger'},{id:'revalidate',x:750,y:170,w:155,h:58,label:'Revalidate edited\naction'},{id:'execute',x:550,y:300,w:155,h:58,label:'Idempotent\nexecution'},{id:'result',x:345,y:300,w:155,h:58,label:'Record external\nresult',type:'store'},{id:'resume',x:145,y:300,w:155,h:58,label:'Resume parent\ngraph',type:'subgraph'}],edges:[
+        {from:'proposal',to:'schema'},{from:'schema',to:'policy'},{from:'policy',to:'allowed'},{from:'allowed',to:'prohibited',fromSide:'bottom',toSide:'top',label:'No',lx:720,ly:285},{from:'allowed',to:'request',fromSide:'top',toSide:'bottom',label:'Approval',lx:720,ly:90},{from:'request',to:'interrupt'},{from:'interrupt',to:'decision',fromSide:'bottom',toSide:'top'},{from:'decision',to:'reject',fromSide:'bottom',toSide:'top',label:'Reject',lx:1030,ly:280},{from:'decision',to:'revalidate',fromSide:'left',toSide:'right',label:'Approve',lx:925,ly:160},{from:'revalidate',to:'execute',fromSide:'bottom',toSide:'top'},{from:'execute',to:'result',fromSide:'left',toSide:'right'},{from:'result',to:'resume',fromSide:'left',toSide:'right'},{from:'reject',to:'resume',fromSide:'left',toSide:'right',via:[[925,327],[925,390],[222,390]],label:'audited',lx:570,ly:382},{from:'prohibited',to:'resume',fromSide:'left',toSide:'right',via:[[725,327],[725,380],[222,380]]}]},
+      runtime:{w:1160,h:420,title:'Persistence, streaming and recovery',groups:[{x:20,y:40,w:700,h:330,label:'SELF-HOSTED LANGGRAPH RUNTIME',fill:'#fbfbff',stroke:'#8c90db'},{x:755,y:40,w:385,h:330,label:'EXTERNAL OBSERVABILITY / USER',fill:'#f7fbff',stroke:'#70a6ce'}],nodes:[
+        {id:'worker',x:55,y:95,w:165,h:58,label:'Engine Worker\nCurrent node',type:'subgraph'},{id:'checkpoint',x:285,y:85,w:180,h:70,label:'PostgreSQL\nCheckpointer',type:'store'},{id:'brain',x:510,y:85,w:175,h:70,label:'Brain / Source Vault\nLarge data',type:'store'},
+        {id:'retry',x:55,y:245,w:165,h:58,label:'Bounded retries'},{id:'dlq',x:285,y:245,w:180,h:58,label:'Dead-letter /\noperator recovery',type:'danger'},{id:'audit',x:510,y:245,w:175,h:58,label:'Append-only audit',type:'store'},
+        {id:'gateway',x:785,y:90,w:155,h:58,label:'Gateway SSE'},{id:'studio',x:975,y:90,w:135,h:58,label:'Studio',type:'external'},{id:'observe',x:785,y:245,w:155,h:58,label:'Observe'},{id:'ops',x:975,y:245,w:135,h:58,label:'Operations',type:'external'}],edges:[
+        {from:'worker',to:'checkpoint',label:'state',lx:252,ly:75},{from:'worker',to:'brain',fromSide:'right',toSide:'left',via:[[245,190],[597,190]],label:'IDs / evidence refs',lx:425,ly:182},{from:'checkpoint',to:'worker',fromSide:'bottom',toSide:'bottom',via:[[375,210],[137,210]],label:'resume',lx:255,ly:202},{from:'worker',to:'retry',fromSide:'bottom',toSide:'top'},{from:'retry',to:'dlq'},{from:'worker',to:'audit',fromSide:'bottom',toSide:'top',dashed:true},{from:'worker',to:'gateway'},{from:'gateway',to:'studio'},{from:'audit',to:'observe',dashed:true},{from:'observe',to:'ops'}]}
+    };
+    document.querySelectorAll('svg[data-diagram]').forEach(svg=>render(svg,specs[svg.dataset.diagram]));
+    const previewPage = Number(new URLSearchParams(location.search).get('page'));
+    if (previewPage > 0) {
+      document.querySelectorAll('.page').forEach((page, index) => {
+        page.style.display = index + 1 === previewPage ? (page.classList.contains('cover') ? 'flex' : 'block') : 'none';
+        if (index + 1 === previewPage) page.style.margin = '0';
+      });
+    }
+  })();
+  </script>
+</body>
+</html>

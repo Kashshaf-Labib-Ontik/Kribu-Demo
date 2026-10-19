@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Why Hermes Agent Cannot Be the Complete KRIBU Platform</title>
+  <style>
+    @page { size: A4; margin: 15mm 16mm 14mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #172033;
+      font: 10.2pt/1.42 "Segoe UI", Arial, sans-serif;
+      background: #fff;
+    }
+    header {
+      border-bottom: 3px solid #5b5ee8;
+      padding-bottom: 11px;
+      margin-bottom: 14px;
+    }
+    .eyebrow {
+      color: #5b5ee8;
+      font-size: 8.5pt;
+      font-weight: 700;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 4px 0 5px;
+      color: #11182a;
+      font-size: 23pt;
+      line-height: 1.12;
+      letter-spacing: -.02em;
+    }
+    .subtitle { margin: 0; color: #566078; font-size: 11pt; }
+    .verdict {
+      margin: 0 0 14px;
+      padding: 11px 13px;
+      border-left: 4px solid #ef7b45;
+      border-radius: 4px;
+      background: #fff4ed;
+    }
+    .verdict strong { color: #9a3f1e; }
+    h2 {
+      margin: 14px 0 7px;
+      color: #202b45;
+      font-size: 14pt;
+      line-height: 1.2;
+    }
+    p { margin: 0 0 7px; }
+    ul { margin: 5px 0 10px 18px; padding: 0; }
+    li { margin: 3px 0; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 8px 0 11px;
+    }
+    .card {
+      padding: 10px 11px;
+      border: 1px solid #dfe3ed;
+      border-radius: 7px;
+      background: #fafbfe;
+      break-inside: avoid;
+    }
+    .card h3 {
+      margin: 0 0 5px;
+      color: #35415e;
+      font-size: 10.5pt;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 7px 0 11px;
+      font-size: 9.2pt;
+    }
+    th, td {
+      padding: 6px 7px;
+      border: 1px solid #dfe3ed;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { color: #2b3550; background: #eef0ff; }
+    .risk { color: #a24122; font-weight: 700; }
+    .fit { color: #276749; font-weight: 700; }
+    .recommendation {
+      padding: 11px 13px;
+      border-radius: 7px;
+      color: #17213b;
+      background: #eef0ff;
+      break-inside: avoid;
+    }
+    .recommendation h2 { margin-top: 0; color: #363aa2; }
+    .flow {
+      margin: 7px 0 5px;
+      padding: 8px 10px;
+      border: 1px dashed #8d91de;
+      border-radius: 5px;
+      text-align: center;
+      font-weight: 650;
+      background: #fff;
+    }
+    footer {
+      margin-top: 13px;
+      padding-top: 8px;
+      border-top: 1px solid #dfe3ed;
+      color: #687188;
+      font-size: 7.9pt;
+    }
+    footer a { color: #4c50b8; text-decoration: none; }
+    .meta { margin-top: 4px; text-align: right; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">KRIBU Architecture Decision Brief</div>
+    <h1>Why Hermes Agent Cannot Be the Complete KRIBU Platform</h1>
+    <p class="subtitle">A concise fit assessment for the approval-demo and future enterprise product</p>
+  </header>
+
+  <section class="verdict">
+    <strong>Decision:</strong> Do not adopt Hermes Agent as KRIBU's entire application foundation. Hermes is a capable open-source <em>personal agent runtime</em>, while KRIBU requires a governed, multi-user enterprise knowledge platform. Hermes may still be evaluated later as a restricted execution component.
+  </section>
+
+  <h2>The fundamental mismatch</h2>
+  <p>Hermes is designed around an agent that can use tools, terminals, skills, memory and messaging. KRIBU must securely ingest a company's documents, respect each user's permissions, produce traceable business findings, pause for accountable approvals and maintain an enterprise audit history.</p>
+
+  <div class="grid">
+    <section class="card">
+      <h3>Hermes is strong at</h3>
+      <ul>
+        <li>Model-provider flexibility and agent tool execution</li>
+        <li>Skills, plugins, scheduling and subagents</li>
+        <li>Streaming runs and human approval pauses</li>
+        <li>Sandbox options and memory integrations</li>
+      </ul>
+    </section>
+    <section class="card">
+      <h3>KRIBU's core responsibility</h3>
+      <ul>
+        <li>Company data governance and access control</li>
+        <li>Evidence-backed analysis with page/cell citations</li>
+        <li>Repeatable departmental workflows and approvals</li>
+        <li>Multi-company operation, auditing and integrations</li>
+      </ul>
+    </section>
+  </div>
+
+  <h2>Critical gaps</h2>
+  <table>
+    <thead>
+      <tr><th>KRIBU requirement</th><th>Hermes starting point</th><th>Impact</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Enterprise tenancy, OIDC, roles and document ACLs</td><td>Officially described as a single-tenant personal agent; profiles are not enterprise authorization boundaries.</td><td class="risk">Major security redesign</td></tr>
+      <tr><td>Authoritative company knowledge</td><td>Personal/session memory and optional memory providers, not a versioned document-and-fact system of record.</td><td class="risk">New knowledge platform required</td></tr>
+      <tr><td>Defensible findings</td><td>General document/tool inspection; no complete page/cell provenance and citation lifecycle for KRIBU reports.</td><td class="risk">Custom ingestion and evidence layer required</td></tr>
+      <tr><td>Reliable business workflows</td><td>Flexible autonomous tool loop rather than KRIBU's typed, deterministic milestone/expenditure/issue pipeline.</td><td class="risk">Domain workflow still required</td></tr>
+      <tr><td>Production operations</td><td>Personal-agent storage and broad tool capabilities do not directly provide scalable jobs, tenant isolation or enterprise audit controls.</td><td class="risk">Control plane still required</td></tr>
+      <tr><td>KRIBU user experience</td><td>General agent interfaces rather than source review, findings, timelines, briefings and assigned approvals.</td><td class="risk">Product UI still required</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Why a deep fork is risky</h2>
+  <ul>
+    <li>Most difficult KRIBU work remains: data ingestion, permissions, provenance, domain workflows, UI and operations.</li>
+    <li>Changing a personal-agent architecture into an enterprise platform creates security and reliability risk.</li>
+    <li>Large internal modifications make upstream upgrades and vulnerability fixes harder to adopt.</li>
+    <li>Hermes's broad terminal, web and file capabilities increase the attack surface unless aggressively restricted.</li>
+  </ul>
+
+  <section class="recommendation">
+    <h2>Recommended approach</h2>
+    <p>Build KRIBU's control plane with FastAPI, PostgreSQL/pgvector, object storage, OIDC/RBAC, deterministic workflows and a domain-specific Next.js interface. Use a small typed agent layer for the first demo.</p>
+    <div class="flow">KRIBU UI → Secure control plane → Retrieval and workflow → Restricted model/agent runtime</div>
+    <p>If later needed, test Hermes behind this boundary for selected skills, model routing or sandboxed tools. Hermes must never decide authorization or receive unrestricted access to company systems.</p>
+  </section>
+
+  <footer>
+    <div><strong>Primary references:</strong> Hermes Agent <a href="https://github.com/NousResearch/hermes-agent">repository</a>, <a href="https://github.com/NousResearch/hermes-agent/blob/main/SECURITY.md">security model</a>, <a href="https://hermes-agent.nousresearch.com/docs/developer-guide/architecture">architecture documentation</a>, and <a href="https://github.com/NousResearch/hermes-agent/blob/main/LICENSE">MIT license</a>.</div>
+    <div class="meta">Prepared for KRIBU · 14 October 2026</div>
+  </footer>
+</body>
+</html>

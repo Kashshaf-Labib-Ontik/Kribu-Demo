@@ -24,4 +24,4 @@ The demo must run locally with free and open-source software. Client data connec
 
 ## Current status
 
-Planning and repository initialization are in progress. Product code has not been scaffolded yet.
+The planning baseline and repository are initialized. Product code has not been scaffolded yet; implementation begins only after the planning documents are reviewed.

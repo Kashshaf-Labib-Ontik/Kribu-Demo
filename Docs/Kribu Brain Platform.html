@@ -1,0 +1,954 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Kribu Brain Platform</title>
+<style>
+/* Layout: navy hero band, then stacked modules: comparison, value, use cases, AI-native journey band, products, CTA */
+:root {
+  --bg: #f6f7fa;
+  --surface: #ffffff;
+  --heading: #0f1f3f;
+  --text: #1a2540;
+  --muted: #5a6c7d;
+  --border: #e0e6f0;
+  --accent: #ff6b35;
+  --accent-soft: rgba(255, 107, 53, 0.07);
+  --success: #0e9f6e;
+  --band: #0f1f3f;
+  --on-band: #ffffff;
+  --on-band-muted: rgba(255, 255, 255, 0.82);
+
+  --font-display: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  --gutter: 24px;
+  --radius: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1322;
+    --surface: #162036;
+    --heading: #f0f4f8;
+    --text: #e3e9f1;
+    --muted: #a8b5c7;
+    --border: #2a3a50;
+    --accent: #ff7a4a;
+    --accent-soft: rgba(255, 122, 74, 0.10);
+    --success: #34d399;
+    --band: #1b2c52;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0d1322;
+  --surface: #162036;
+  --heading: #f0f4f8;
+  --text: #e3e9f1;
+  --muted: #a8b5c7;
+  --border: #2a3a50;
+  --accent: #ff7a4a;
+  --accent-soft: rgba(255, 122, 74, 0.10);
+  --success: #34d399;
+  --band: #1b2c52;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.6;
+  padding-inline: var(--gutter);
+}
+
+/* ===== HERO ===== */
+.hero {
+  background: var(--band);
+  color: var(--on-band);
+  text-align: center;
+  margin-inline: calc(-1 * var(--gutter));
+  padding: 64px var(--gutter) 48px;
+  margin-bottom: 48px;
+}
+
+.hero h1 {
+  font-family: var(--font-display);
+  font-size: clamp(34px, 6vw, 50px);
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+.accent-bar {
+  width: 60px;
+  height: 4px;
+  background: var(--accent);
+  margin: 18px auto;
+  border-radius: 2px;
+}
+
+.tagline {
+  font-family: var(--font-display);
+  font-size: clamp(19px, 3.4vw, 26px);
+  font-weight: 600;
+  margin: 0 auto 12px;
+  max-width: 720px;
+  text-wrap: balance;
+}
+
+.subline {
+  font-size: clamp(15px, 2.4vw, 17px);
+  color: var(--on-band-muted);
+  max-width: 640px;
+  margin: 0 auto;
+  text-wrap: balance;
+}
+
+/* ===== LAYOUT ===== */
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding-bottom: 40px;
+  display: grid;
+  gap: 56px;
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--heading);
+  margin: 0 0 8px;
+  text-wrap: balance;
+}
+
+.section-lead {
+  color: var(--muted);
+  margin: 0 0 28px;
+  max-width: 680px;
+}
+
+/* ===== SECOND BRAIN DIAGRAM ===== */
+.diagram {
+  margin: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.diagram-scroll { overflow-x: auto; }
+
+.dg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-width: 900px;
+}
+
+.diagram figcaption {
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 14px;
+  max-width: 780px;
+}
+
+.scroll-hint {
+  display: none;
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+.dg text { font-family: var(--font-body); fill: var(--text); }
+.dg .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 1.2px; fill: var(--muted); }
+.dg .eyebrow.acc { fill: var(--accent); }
+.dg .t-xs { font-size: 10px; }
+.dg .t-s { font-size: 11px; }
+.dg .t-m { font-size: 12px; font-weight: 500; }
+.dg .t-mb { font-size: 12px; font-weight: 700; fill: var(--heading); }
+.dg .t-l { font-size: 13px; font-weight: 700; fill: var(--heading); }
+.dg .t-xl { font-family: var(--font-display); font-size: 17px; font-weight: 700; fill: var(--heading); }
+.dg .muted { fill: var(--muted); }
+.dg .acc-text { fill: var(--accent); font-weight: 600; }
+.dg .box { fill: var(--surface); stroke: var(--border); stroke-width: 1.2; }
+.dg .brain { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 2; }
+.dg .pill { fill: var(--band); }
+.dg .pill-text { fill: var(--on-band); font-size: 11px; font-weight: 700; letter-spacing: 0.3px; }
+.dg .lane { fill: var(--surface); stroke: var(--accent); stroke-width: 1.2; }
+.dg .step { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.2; }
+.dg .chip { fill: var(--bg); stroke: var(--border); }
+.dg .chip-hot { fill: var(--accent-soft); stroke: var(--accent); }
+.dg .line { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+.dg .line-acc { stroke: var(--accent); stroke-width: 1.8; fill: none; }
+.dg .edge { stroke: var(--muted); stroke-opacity: 0.45; stroke-width: 1.4; }
+.dg .node { fill: var(--surface); stroke: var(--heading); stroke-width: 1.5; }
+.dg .ah { fill: var(--muted); }
+.dg .ah-acc { fill: var(--accent); }
+.dg .audit { fill: var(--surface); stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 5 4; }
+
+/* ===== COMPARISON ===== */
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+.comparison-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+
+.comparison-card.highlight {
+  border: 2px solid var(--accent);
+  background: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--surface);
+}
+
+.comparison-card h3 {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--heading);
+  margin: 0;
+}
+
+.comparison-card.highlight h3 { color: var(--accent); }
+
+.card-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 2px 0 0;
+}
+
+.card-head {
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.comparison-card.highlight .card-head { border-bottom-color: var(--accent); }
+
+.comparison-item + .comparison-item { margin-top: 14px; }
+
+.comparison-item strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--heading);
+  margin-bottom: 2px;
+}
+
+.comparison-item p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.checkmark { color: var(--success); margin-right: 4px; }
+.cross { color: var(--muted); margin-right: 4px; }
+
+/* ===== VALUE ===== */
+.value-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.value-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.value-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--accent);
+}
+
+.value-icon {
+  font-size: 26px;
+  margin-bottom: 10px;
+}
+
+.value-card h3 {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--heading);
+  margin: 0 0 6px;
+}
+
+.value-card p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* ===== USE CASES ===== */
+.usecase-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.usecase-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 22px;
+}
+
+.usecase-card h4 {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--heading);
+  margin: 0 0 12px;
+}
+
+.usecase-card p {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.usecase-card p + p { margin-top: 10px; }
+
+.usecase-card .label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text);
+  display: block;
+  margin-bottom: 2px;
+}
+
+/* ===== AI-NATIVE JOURNEY ===== */
+.journey {
+  background: var(--band);
+  color: var(--on-band);
+  border-radius: var(--radius);
+  padding: 40px;
+}
+
+.journey h2 {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0 0 8px;
+  text-wrap: balance;
+}
+
+.journey-lead {
+  color: var(--on-band-muted);
+  margin: 0 0 32px;
+  max-width: 680px;
+}
+
+.journey-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.step {
+  border-left: 3px solid var(--accent);
+  padding-left: 18px;
+}
+
+.step-tag {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--accent);
+}
+
+.step h3 {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  margin: 4px 0 8px;
+}
+
+.step p {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--on-band-muted);
+  line-height: 1.55;
+}
+
+.journey-promise {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.promise h4 {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.promise p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--on-band-muted);
+}
+
+/* ===== PRODUCTS ===== */
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.product-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 26px;
+  text-align: center;
+  transition: border-color 0.2s;
+}
+
+.product-card:hover { border-color: var(--accent); }
+
+.product-badge {
+  display: inline-block;
+  background: var(--accent);
+  color: #ffffff;
+  padding: 3px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.product-card h3 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--heading);
+  margin: 12px 0 8px;
+}
+
+.product-card p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* ===== CTA ===== */
+.cta-section {
+  background: var(--accent);
+  color: #ffffff;
+  border-radius: var(--radius);
+  padding: 40px var(--gutter);
+  text-align: center;
+}
+
+.cta-section h2 {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0 0 8px;
+  text-wrap: balance;
+}
+
+.cta-section p {
+  margin: 0 auto 22px;
+  max-width: 560px;
+  font-size: 16px;
+}
+
+.cta-button {
+  display: inline-block;
+  background: #ffffff;
+  color: #c2410c;
+  padding: 13px 30px;
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 15px;
+  border: none;
+  cursor: pointer;
+}
+
+.cta-button:focus-visible { outline: 3px solid var(--band); outline-offset: 3px; }
+
+.footer {
+  text-align: center;
+  padding: 28px 0 8px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 960px) {
+  .journey-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 860px) {
+  .comparison-grid,
+  .value-grid,
+  .usecase-grid,
+  .products-grid,
+  .journey-promise { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 940px) {
+  .scroll-hint { display: block; }
+}
+
+@media (max-width: 560px) {
+  :root { --gutter: 16px; }
+  .diagram { padding: 14px; }
+  .journey { padding: 28px 20px; }
+  .journey-steps { grid-template-columns: 1fr; }
+  .section-title, .journey h2, .cta-section h2 { font-size: 22px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .value-card { transition: none; }
+  .value-card:hover { transform: none; }
+}
+</style>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500;600;700&display=swap">
+
+<div class="hero">
+  <h1>Kribu Brain</h1>
+  <div class="accent-bar"></div>
+  <p class="tagline">Build an AI-native company. Without the enterprise sprawl.</p>
+  <p class="subline">AI sovereignty for growing businesses: your knowledge, your rules, your data.</p>
+</div>
+
+<div class="container">
+
+  <!-- SECOND BRAIN -->
+  <section>
+    <h2 class="section-title">Your Company's Second Brain</h2>
+    <p class="section-lead">Kribu Brain connects to the tools you already use, remembers how your company works, and lets AI agents carry out multi-step work for your teams, all within the rules you set. Each agent is built from skills: small, reusable steps that any team can combine.</p>
+
+    <figure class="diagram">
+      <p class="scroll-hint">Scroll sideways to see the full diagram.</p>
+      <div class="diagram-scroll">
+        <svg class="dg" viewBox="0 0 1050 510" role="img" aria-label="Your tools sync live into Kribu Brain's company memory. Inside a governance boundary, AI agents take context from that memory and pick skills from the library, then chain them: research lead, draft proposal, send follow-up. Results go back to your teams and actions go back into your tools. Every run is written to an audit log, and outcomes improve the agents.">
+          <defs>
+            <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path class="ah" d="M0,0 L10,5 L0,10 z"/>
+            </marker>
+            <marker id="arr-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path class="ah-acc" d="M0,0 L10,5 L0,10 z"/>
+            </marker>
+          </defs>
+
+          <!-- Column headers -->
+          <text x="105" y="48" text-anchor="middle" class="eyebrow">YOUR TOOLS</text>
+          <text x="950" y="48" text-anchor="middle" class="eyebrow">YOUR TEAMS</text>
+
+          <!-- Tools -->
+          <rect class="box" x="20" y="66" width="170" height="38" rx="8"/>
+          <text x="105" y="89" text-anchor="middle" class="t-m">ERP &amp; Accounting</text>
+          <rect class="box" x="20" y="118" width="170" height="38" rx="8"/>
+          <text x="105" y="141" text-anchor="middle" class="t-m">CRM</text>
+          <rect class="box" x="20" y="170" width="170" height="38" rx="8"/>
+          <text x="105" y="193" text-anchor="middle" class="t-m">Email</text>
+          <rect class="box" x="20" y="222" width="170" height="38" rx="8"/>
+          <text x="105" y="245" text-anchor="middle" class="t-m">Documents &amp; Drive</text>
+          <rect class="box" x="20" y="274" width="170" height="38" rx="8"/>
+          <text x="105" y="297" text-anchor="middle" class="t-m">Meetings &amp; Calendar</text>
+          <rect class="box" x="20" y="326" width="170" height="38" rx="8"/>
+          <text x="105" y="349" text-anchor="middle" class="t-m">HR System</text>
+
+          <!-- Tools bus -->
+          <line class="line" x1="190" y1="85" x2="212" y2="85"/>
+          <line class="line" x1="190" y1="137" x2="212" y2="137"/>
+          <line class="line" x1="190" y1="189" x2="212" y2="189"/>
+          <line class="line" x1="190" y1="241" x2="212" y2="241"/>
+          <line class="line" x1="190" y1="293" x2="212" y2="293"/>
+          <line class="line" x1="190" y1="345" x2="212" y2="345"/>
+          <line class="line" x1="212" y1="85" x2="212" y2="362"/>
+
+          <!-- Tools to memory / agent back to tools -->
+          <line class="line" x1="212" y1="189" x2="318" y2="189" marker-end="url(#arr)"/>
+          <text x="257" y="180" text-anchor="middle" class="t-s muted">syncs live</text>
+          <line class="line" x1="320" y1="362" x2="215" y2="362" marker-end="url(#arr)"/>
+          <text x="257" y="354" text-anchor="middle" class="t-s muted">takes action</text>
+
+          <!-- Brain boundary = governance -->
+          <rect class="brain" x="300" y="66" width="460" height="354" rx="16"/>
+          <rect class="pill" x="380" y="54" width="300" height="24" rx="12"/>
+          <text x="530" y="70" text-anchor="middle" class="pill-text">Governance: roles · data policies · ownership</text>
+          <text x="530" y="102" text-anchor="middle" class="eyebrow acc">KRIBU BRAIN</text>
+          <text x="530" y="124" text-anchor="middle" class="t-xl">Your company's second brain</text>
+
+          <!-- Company memory -->
+          <rect class="box" x="320" y="140" width="200" height="130" rx="10"/>
+          <text x="420" y="164" text-anchor="middle" class="t-l">Company memory</text>
+          <text x="420" y="180" text-anchor="middle" class="t-xs muted">knowledge graph, always current</text>
+          <line class="edge" x1="360" y1="212" x2="420" y2="212"/>
+          <line class="edge" x1="420" y1="212" x2="480" y2="212"/>
+          <line class="edge" x1="360" y1="212" x2="390" y2="244"/>
+          <line class="edge" x1="420" y1="212" x2="390" y2="244"/>
+          <line class="edge" x1="420" y1="212" x2="450" y2="244"/>
+          <line class="edge" x1="390" y1="244" x2="450" y2="244"/>
+          <line class="edge" x1="450" y1="244" x2="480" y2="212"/>
+          <circle class="node" cx="360" cy="212" r="5.5"/>
+          <circle class="node" cx="420" cy="212" r="5.5"/>
+          <circle class="node" cx="480" cy="212" r="5.5"/>
+          <circle class="node" cx="390" cy="244" r="5.5"/>
+          <circle class="node" cx="450" cy="244" r="5.5"/>
+          <text x="360" y="201" text-anchor="middle" class="t-xs">Clients</text>
+          <text x="420" y="201" text-anchor="middle" class="t-xs">Orders</text>
+          <text x="480" y="201" text-anchor="middle" class="t-xs">Invoices</text>
+          <text x="390" y="261" text-anchor="middle" class="t-xs">People</text>
+          <text x="450" y="261" text-anchor="middle" class="t-xs">Policies</text>
+
+          <!-- Skills library -->
+          <rect class="box" x="540" y="140" width="200" height="130" rx="10"/>
+          <text x="640" y="164" text-anchor="middle" class="t-l">Agents &amp; skills library</text>
+          <text x="640" y="180" text-anchor="middle" class="t-xs muted">reusable, improves with use</text>
+          <rect class="chip-hot" x="552" y="190" width="88" height="20" rx="10"/>
+          <text x="596" y="204" text-anchor="middle" class="t-xs acc-text">Lead research</text>
+          <rect class="chip-hot" x="646" y="190" width="88" height="20" rx="10"/>
+          <text x="690" y="204" text-anchor="middle" class="t-xs acc-text">Draft proposal</text>
+          <rect class="chip-hot" x="552" y="214" width="88" height="20" rx="10"/>
+          <text x="596" y="228" text-anchor="middle" class="t-xs acc-text">Send follow-up</text>
+          <rect class="chip" x="646" y="214" width="88" height="20" rx="10"/>
+          <text x="690" y="228" text-anchor="middle" class="t-xs">Invoice check</text>
+          <rect class="chip" x="552" y="238" width="88" height="20" rx="10"/>
+          <text x="596" y="252" text-anchor="middle" class="t-xs">Onboard hire</text>
+          <rect class="chip" x="646" y="238" width="88" height="20" rx="10"/>
+          <text x="690" y="252" text-anchor="middle" class="t-xs">Weekly report</text>
+
+          <!-- Memory & skills feed the agent; outcomes improve skills -->
+          <line class="line" x1="420" y1="271" x2="420" y2="303" marker-end="url(#arr)"/>
+          <text x="428" y="291" class="t-xs muted">context</text>
+          <line class="line" x1="600" y1="271" x2="600" y2="303" marker-end="url(#arr)"/>
+          <text x="608" y="291" class="t-xs muted">agents</text>
+          <line class="line-acc" x1="700" y1="305" x2="700" y2="273" marker-end="url(#arr-acc)"/>
+          <text x="692" y="291" text-anchor="end" class="t-xs acc-text">learns</text>
+
+          <!-- Agent workflow lane -->
+          <rect class="lane" x="320" y="306" width="420" height="100" rx="10"/>
+          <text x="334" y="328" class="t-mb">AI agents chain skills</text>
+          <text x="726" y="328" text-anchor="end" class="t-xs muted">example: a new lead arrives</text>
+          <rect class="step" x="334" y="344" width="112" height="36" rx="8"/>
+          <text x="390" y="366" text-anchor="middle" class="t-m">Research lead</text>
+          <rect class="step" x="474" y="344" width="112" height="36" rx="8"/>
+          <text x="530" y="366" text-anchor="middle" class="t-m">Draft proposal</text>
+          <rect class="step" x="614" y="344" width="112" height="36" rx="8"/>
+          <text x="670" y="366" text-anchor="middle" class="t-m">Send follow-up</text>
+          <line class="line-acc" x1="446" y1="362" x2="472" y2="362" marker-end="url(#arr-acc)"/>
+          <line class="line-acc" x1="586" y1="362" x2="612" y2="362" marker-end="url(#arr-acc)"/>
+
+          <!-- Teams -->
+          <rect class="box" x="870" y="66" width="160" height="38" rx="8"/>
+          <text x="950" y="89" text-anchor="middle" class="t-m">Finance</text>
+          <rect class="box" x="870" y="118" width="160" height="38" rx="8"/>
+          <text x="950" y="141" text-anchor="middle" class="t-m">Sales</text>
+          <rect class="box" x="870" y="170" width="160" height="38" rx="8"/>
+          <text x="950" y="193" text-anchor="middle" class="t-m">HR</text>
+          <rect class="box" x="870" y="222" width="160" height="38" rx="8"/>
+          <text x="950" y="245" text-anchor="middle" class="t-m">Operations</text>
+          <rect class="box" x="870" y="274" width="160" height="38" rx="8"/>
+          <text x="950" y="297" text-anchor="middle" class="t-m">Leadership</text>
+
+          <!-- Teams bus -->
+          <line class="line" x1="850" y1="85" x2="870" y2="85"/>
+          <line class="line" x1="850" y1="137" x2="870" y2="137"/>
+          <line class="line" x1="850" y1="189" x2="870" y2="189"/>
+          <line class="line" x1="850" y1="241" x2="870" y2="241"/>
+          <line class="line" x1="850" y1="293" x2="870" y2="293"/>
+          <line class="line" x1="850" y1="85" x2="850" y2="372"/>
+
+          <!-- Teams ask / get results -->
+          <line class="line" x1="850" y1="340" x2="743" y2="340" marker-end="url(#arr)"/>
+          <text x="805" y="332" text-anchor="middle" class="t-s muted">asks</text>
+          <line class="line" x1="741" y1="372" x2="847" y2="372" marker-end="url(#arr)"/>
+          <text x="805" y="390" text-anchor="middle" class="t-s muted">gets results</text>
+
+          <!-- Audit log -->
+          <line class="line" x1="530" y1="407" x2="530" y2="448" marker-end="url(#arr)"/>
+          <text x="540" y="434" class="t-xs muted">every run logged</text>
+          <rect class="audit" x="300" y="450" width="460" height="40" rx="10"/>
+          <text x="530" y="474" text-anchor="middle" class="t-s">Audit log · who ran what, when, on which data, with what outcome</text>
+        </svg>
+      </div>
+      <figcaption>Your tools feed a live company memory. When a team asks for something, AI agents pull context from that memory, pick the right skills from the library and chain them to finish the job. Everything runs inside your governance rules, every run is logged, and each outcome makes your agents better.</figcaption>
+    </figure>
+  </section>
+
+  <!-- DISTINCTION & GOVERNANCE -->
+  <section>
+    <h2 class="section-title">Kribu Brain vs. The Alternatives</h2>
+    <p class="section-lead">Frontier AI tools make individuals faster. Kribu Brain makes the whole company smarter, with clear rules on who can do what with which data.</p>
+
+    <div class="comparison-grid">
+      <div class="comparison-card">
+        <div class="card-head">
+          <h3>Frontier AI Platforms</h3>
+          <p class="card-sub">ChatGPT, Claude, Gemini and similar</p>
+        </div>
+        <div class="comparison-item">
+          <strong><span class="cross">✕</span>Each use starts fresh</strong>
+          <p>Every prompt rebuilds context. What one person figures out stays with that person.</p>
+        </div>
+        <div class="comparison-item">
+          <strong><span class="cross">✕</span>No governance layer</strong>
+          <p>No clear rules on who can access which data, or who owns an AI-assisted decision.</p>
+        </div>
+        <div class="comparison-item">
+          <strong><span class="cross">✕</span>No audit trail</strong>
+          <p>Hard to show how a decision was reached, by whom, and with which data.</p>
+        </div>
+        <div class="comparison-item">
+          <strong><span class="cross">✕</span>Easy to copy</strong>
+          <p>Your competitors use the same tools. Any advantage fades quickly.</p>
+        </div>
+      </div>
+
+      <div class="comparison-card highlight">
+        <div class="card-head">
+          <h3>Kribu Brain</h3>
+          <p class="card-sub">Your company's AI operating layer</p>
+        </div>
+        <div class="comparison-item">
+          <strong><span class="checkmark">✓</span>Agents that compound</strong>
+          <p>Every workflow becomes a reusable AI agent, built from skills, that improves as your team uses it.</p>
+        </div>
+        <div class="comparison-item">
+          <strong><span class="checkmark">✓</span>Governance built in</strong>
+          <p>Role-based access, data policies and clear ownership from day one.</p>
+        </div>
+        <div class="comparison-item">
+          <strong><span class="checkmark">✓</span>Complete audit trail</strong>
+          <p>Who ran which agent, when, on what data, and what the outcome was.</p>
+        </div>
+        <div class="comparison-item">
+          <strong><span class="checkmark">✓</span>An advantage you own</strong>
+          <p>Your processes and know-how, captured as assets competitors cannot copy.</p>
+        </div>
+      </div>
+
+      <div class="comparison-card">
+        <div class="card-head">
+          <h3>Custom Engineering</h3>
+          <p class="card-sub">In-house builds or consultants</p>
+        </div>
+        <div class="comparison-item">
+          <strong><span class="cross">✕</span>Expensive and slow</strong>
+          <p>Long build cycles and large upfront budgets most growing businesses can't spare.</p>
+        </div>
+        <div class="comparison-item">
+          <strong><span class="cross">✕</span>Engineering bottleneck</strong>
+          <p>Every change waits in the development queue.</p>
+        </div>
+        <div class="comparison-item">
+          <strong><span class="cross">✕</span>Governance scattered</strong>
+          <p>Rules live inside separate scripts and integrations. Hard to track who owns what.</p>
+        </div>
+        <div class="comparison-item">
+          <strong><span class="cross">✕</span>Hard to scale</strong>
+          <p>Each new process means another project and another budget.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VALUE -->
+  <section>
+    <h2 class="section-title">What Your Business Gains</h2>
+    <p class="section-lead">The value shows up in how your company runs: who spends time on what, how knowledge is kept, and how confidently you can grow.</p>
+
+    <div class="value-grid">
+      <div class="value-card">
+        <div class="value-icon">🎯</div>
+        <h3>Your people on high-value work</h3>
+        <p>Routine reporting, data gathering and follow-ups are handled by AI agents, so your team spends its time on customers, decisions and growth.</p>
+      </div>
+
+      <div class="value-card">
+        <div class="value-icon">🚀</div>
+        <h3>Faster onboarding</h3>
+        <p>New hires learn from a library of agents and skills that shows how your company actually works, and start contributing sooner.</p>
+      </div>
+
+      <div class="value-card">
+        <div class="value-icon">📚</div>
+        <h3>Knowledge that stays</h3>
+        <p>When someone moves on, their know-how stays in the agents and skills they built. No more starting over after every resignation.</p>
+      </div>
+
+      <div class="value-card">
+        <div class="value-icon">🛡️</div>
+        <h3>Control over your data</h3>
+        <p>You decide who sees what. Sensitive data stays within the boundaries you set, and your AI capability stays yours.</p>
+      </div>
+
+      <div class="value-card">
+        <div class="value-icon">✅</div>
+        <h3>Compliance confidence</h3>
+        <p>Every AI-assisted decision is traceable, which makes audits, client due diligence and regulatory checks simpler.</p>
+      </div>
+
+      <div class="value-card">
+        <div class="value-icon">📈</div>
+        <h3>Grow without the overhead</h3>
+        <p>Take on more customers, orders and requests without adding headcount at the same pace.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- USE CASES -->
+  <section>
+    <h2 class="section-title">How It Solves Real Problems</h2>
+    <p class="section-lead">Kribu Brain works across departments, and agents built by one team can be reused by another.</p>
+
+    <div class="usecase-grid">
+      <div class="usecase-card">
+        <h4>Finance &amp; Accounts</h4>
+        <p><span class="label">Problem</span>Month-end means hours of collecting, reconciling and formatting data.</p>
+        <p><span class="label">With Kribu Brain</span>Invoice processing, expense checks and report generation are handled by AI agents. The team reviews instead of compiling.</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>Sales &amp; Marketing</h4>
+        <p><span class="label">Problem</span>Reps research leads and write proposals by hand instead of selling.</p>
+        <p><span class="label">With Kribu Brain</span>Lead research, proposal drafting and follow-up agents work together, so reps spend their time in conversations.</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>HR &amp; Administration</h4>
+        <p><span class="label">Problem</span>Onboarding and internal requests fill HR's week, and new hires learn by trial and error.</p>
+        <p><span class="label">With Kribu Brain</span>Onboarding steps and request handling run automatically. New hires learn from the library of agents and skills.</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>Operations &amp; Supply Chain</h4>
+        <p><span class="label">Problem</span>Each team keeps its own SOPs and supplier comparisons, and they drift apart.</p>
+        <p><span class="label">With Kribu Brain</span>Shared SOP and procurement agents serve every team, and one improvement reaches everyone.</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>Customer Service &amp; Support</h4>
+        <p><span class="label">Problem</span>Queries are routed by hand and answers vary from agent to agent.</p>
+        <p><span class="label">With Kribu Brain</span>Agents for classification, case summaries and routing keep answers consistent and responses quick.</p>
+      </div>
+
+      <div class="usecase-card">
+        <h4>Management &amp; Leadership</h4>
+        <p><span class="label">Problem</span>Leaders spend their time chasing updates instead of making decisions.</p>
+        <p><span class="label">With Kribu Brain</span>Automated reporting and cross-department visibility, with meeting actions tracked to completion.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- AI-NATIVE JOURNEY + SUPPORT MODEL -->
+  <section class="journey">
+    <h2>How We Help You Become AI-Native</h2>
+    <p class="journey-lead">You don't need an AI team to get started. We work alongside your people, build the first AI agents with them, and stay until running Kribu Brain is simply part of how your company works.</p>
+
+    <div class="journey-steps">
+      <div class="step">
+        <span class="step-tag">Discover</span>
+        <h3>Map your workflows</h3>
+        <p>We sit with your teams to find where AI takes the most load off first, and agree on data access and governance rules upfront.</p>
+      </div>
+
+      <div class="step">
+        <span class="step-tag">Train</span>
+        <h3>Hands-on workshops</h3>
+        <p>Your team learns to use, design and improve agents and skills in plain language. No coding background needed.</p>
+      </div>
+
+      <div class="step">
+        <span class="step-tag">Build together</span>
+        <h3>Ramp-up development</h3>
+        <p>Our engineers build your first AI agents with your team and connect them to the tools you already use.</p>
+      </div>
+
+      <div class="step">
+        <span class="step-tag">Scale &amp; own</span>
+        <h3>Your team takes over</h3>
+        <p>Your people roll out agents to new departments on their own. We stay on as advisors as you grow.</p>
+      </div>
+    </div>
+
+    <div class="journey-promise">
+      <div class="promise">
+        <h4>No AI team required</h4>
+        <p>We bring the expertise. Your people bring the business knowledge.</p>
+      </div>
+      <div class="promise">
+        <h4>Early wins first</h4>
+        <p>We start with the workflows where your team will feel the difference fastest.</p>
+      </div>
+      <div class="promise">
+        <h4>Independence by design</h4>
+        <p>The goal is a team that runs and improves Kribu Brain without us.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRODUCTS -->
+  <section>
+    <h2 class="section-title">Complementary Products</h2>
+    <p class="section-lead">Ready-made tools for everyday work, built on the same governed platform.</p>
+
+    <div class="products-grid">
+      <div class="product-card">
+        <span class="product-badge">Add-on</span>
+        <h3>KRIBU Docs</h3>
+        <p>Intelligent document processing, information extraction, comparison and generation for contracts, proposals and reports.</p>
+      </div>
+
+      <div class="product-card">
+        <span class="product-badge">Add-on</span>
+        <h3>KRIBU Notes</h3>
+        <p>Meeting transcription and summarization, with decisions, action items and follow-ups captured and tracked.</p>
+      </div>
+
+      <div class="product-card">
+        <span class="product-badge">Add-on</span>
+        <h3>KRIBU Mailsmart</h3>
+        <p>Email classification, summarization, response drafting and workflow management, so important messages never slip through.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <div class="cta-section">
+    <h2>Ready to Become AI-Native?</h2>
+    <p>Book a strategy session and we'll map where AI can take the load off your team first.</p>
+    <button class="cta-button" type="button">Schedule a Strategy Session</button>
+  </div>
+
+  <div class="footer">
+    <p>Kribu Brain © 2026 | Build an AI-native company</p>
+  </div>
+
+</div>
+
+</body></html>
