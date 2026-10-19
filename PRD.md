@@ -1,6 +1,6 @@
 # KRIBU Demo Product Requirements
 
-**Status:** Planning baseline
+**Status:** Active delivery baseline through Iteration 3
 
 **Scope:** Local, synthetic-data demo
 
@@ -124,9 +124,9 @@ The demo proves these capabilities with synthetic files because live client data
 - **Security:** zero cross-tenant or unauthorized-document leakage in automated security tests.
 - **Grounding:** every material factual claim is supported by an accessible citation.
 - **Reliability:** duplicate jobs are idempotent; interrupted workflows resume from a checkpoint.
-- **Performance target:** first progress event within 2 seconds; simple retrieval response within 15 seconds and multi-document analysis within 90 seconds on the reference machine. Local-model speed is reported, not hidden.
+- **Performance target:** first progress event within 2 seconds; simple retrieval response within 15 seconds and multi-document analysis within 90 seconds on the reference machine. External-model latency and quota delays are reported, not hidden.
 - **Accessibility:** keyboard access, visible focus, semantic markup, and WCAG 2.2 AA color contrast.
-- **Privacy:** no demo content is sent to a hosted model or telemetry service by default.
+- **Privacy:** only synthetic demo content may be sent to Gemini; hosted telemetry remains disabled by default.
 - **Portability:** provider interfaces isolate model, embedding, object storage, identity, policy, and connector implementations.
 - **Auditability:** each run records prompt/skill version, model, retrieved evidence, policy decisions, tool calls, approvals, timings, and output.
 
@@ -153,9 +153,9 @@ The demo is accepted when:
 - Synthetic data must be designed together with expected answers before prompt tuning.
 - Client schemas and connectors are placeholders until discovery after demo approval.
 
-## 10. Open decisions before scaffolding
+## 10. Remaining delivery decisions
 
 - Exact development-machine CPU model and operating-system version.
 - Whether the demo must run fully offline after initial dependency/model download.
 - Which user will demonstrate each role and approval path.
-- Maximum acceptable local-model response time during the live presentation.
+- Maximum acceptable Gemini response time during the live presentation.

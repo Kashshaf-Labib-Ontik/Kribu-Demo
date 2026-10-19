@@ -44,7 +44,7 @@ Start the complete local foundation:
 docker compose up --build
 ```
 
-The Studio runs at `http://localhost:3000`, the API at `http://localhost:8000`, and API documentation at `http://localhost:8000/docs` in development.
+The Studio runs at `http://localhost:3000`, the API at `http://localhost:8000`, Keycloak at `http://localhost:8180`, and API documentation at `http://localhost:8000/docs` in development. Compose bootstraps the restricted API database role, applies Alembic migrations, and imports the synthetic Keycloak realm.
 
 Add a Google AI Studio key to your uncommitted `.env` as `KRIBU_GEMINI_API_KEY`. Verify structured output, streaming, usage metadata, and function selection with the script's built-in synthetic prompts:
 
@@ -56,10 +56,20 @@ Set-Location ../..
 
 The command refuses placeholder/missing credentials and production mode. It declares a demo tool but does not execute it.
 
+Verify OIDC tokens, both seeded tenant identities, anonymous denial, and live PostgreSQL RLS:
+
+```powershell
+Set-Location services/api
+uv run python -m scripts.verify_identity --confirm-synthetic
+Set-Location ../..
+```
+
+The local demo usernames and replaceable development passwords are documented in `.env.example`. The `kribu-verifier` password flow exists only for this verification command; Studio will use authorization code with PKCE in a later iteration.
+
 For faster application development, run PostgreSQL in Docker and the applications on the host:
 
 ```powershell
-docker compose up -d postgres
+docker compose up -d postgres db-bootstrap migrate keycloak-postgres keycloak
 uv run --package kribu-api uvicorn app.main:app --app-dir services/api --reload
 pnpm dev:web
 ```
@@ -74,4 +84,4 @@ docker compose config --quiet
 
 ## Current status
 
-Iteration 2 is implemented and live-verified with synthetic Gemini prompts. The backend now has a Gemini provider boundary with synthetic-data enforcement, structured output, streaming, tool selection, safe provider errors, and focused tests.
+Iteration 2 is committed and live-verified. Iteration 3 is implemented and live-verified in the uncommitted working tree: local Keycloak identity, strict JWT validation, trusted request context, Alembic-managed tenant tables, and PostgreSQL RLS. It is awaiting owner review.

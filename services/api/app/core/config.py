@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     database_url: str = "postgresql+asyncpg://kribu:kribu_dev_only@localhost:5432/kribu"
     cors_origins: list[AnyHttpUrl] = [AnyHttpUrl("http://localhost:3000")]
+    oidc_issuer_url: str = "http://localhost:8180/realms/kribu-demo"
+    oidc_jwks_url: str = "http://localhost:8180/realms/kribu-demo/protocol/openid-connect/certs"
+    oidc_audience: str = "kribu-api"
+    oidc_clock_skew_seconds: int = Field(default=30, ge=0, le=120)
     model_provider: Literal["gemini"] = "gemini"
     model_data_policy: Literal["synthetic_only"] = "synthetic_only"
     gemini_api_key: SecretStr | None = None

@@ -163,6 +163,6 @@ Use a small working exercise for each topic rather than completing long courses 
 - Repository is free of secrets, real client data, model weights, volumes, and accidental generated files.
 - Presenter runbook includes expected duration, reset procedure, and fallback screenshots/artifacts.
 
-## 8. Kickoff gate
+## 8. Current delivery gate
 
-Do not scaffold application code until the owner reviews these six documents and answers the hardware/offline questions in `PRD.md`. Once accepted, Iteration 1 is the next unit of work.
+Iterations 0-2 are owner-reviewed and committed on `dev-v1.0.x`. Iteration 3 establishes authentication and the tenant boundary. Each subsequent iteration remains uncommitted until its focused checks pass and the owner reviews the working-tree changes.

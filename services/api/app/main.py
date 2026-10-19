@@ -6,12 +6,16 @@ from uuid import uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import create_async_engine
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
 from app.api.router import api_router
 from app.core.config import get_settings
+from app.core.database import create_session_factory
+from app.identity.errors import IdentityError
+from app.identity.tokens import OidcTokenVerifier
 
 
 @asynccontextmanager
@@ -19,6 +23,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     engine = create_async_engine(settings.database_url, pool_pre_ping=True)
     app.state.database_engine = engine
+    app.state.database_session_factory = create_session_factory(engine)
+    app.state.token_verifier = OidcTokenVerifier(settings)
     yield
     await engine.dispose()
 
@@ -40,6 +46,22 @@ def create_app() -> FastAPI:
         allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Correlation-ID"],
     )
 
+    @application.exception_handler(IdentityError)
+    async def identity_error(request: Request, exc: IdentityError) -> JSONResponse:
+        headers = {"WWW-Authenticate": "Bearer"} if exc.status_code == 401 else None
+        return JSONResponse(
+            status_code=exc.status_code,
+            headers=headers,
+            content={
+                "type": "about:blank",
+                "title": "Unauthorized" if exc.status_code == 401 else "Forbidden",
+                "status": exc.status_code,
+                "detail": exc.safe_message,
+                "code": exc.code,
+                "correlation_id": request.state.correlation_id,
+            },
+        )
+
     @application.middleware("http")
     async def correlation_id(
         request: Request,
@@ -56,4 +78,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-

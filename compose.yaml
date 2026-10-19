@@ -19,6 +19,95 @@ services:
       retries: 12
     restart: unless-stopped
 
+  db-bootstrap:
+    image: pgvector/pgvector:0.8.7-pg18-bookworm
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-kribu_dev_only}
+      POSTGRES_DB: ${POSTGRES_DB:-kribu}
+      POSTGRES_USER: ${POSTGRES_USER:-kribu}
+      KRIBU_APP_DB_USER: ${KRIBU_APP_DB_USER:-kribu_app}
+      KRIBU_APP_DB_PASSWORD: ${KRIBU_APP_DB_PASSWORD:-kribu_app_dev_only}
+    volumes:
+      - ./infra/compose/postgres/bootstrap:/bootstrap:ro
+    command: >-
+      sh -c 'psql -v ON_ERROR_STOP=1
+      -v app_user="$${KRIBU_APP_DB_USER}"
+      -v app_password="$${KRIBU_APP_DB_PASSWORD}"
+      -v app_database="$${POSTGRES_DB}"
+      -h postgres -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      -f /bootstrap/001_app_role.sql'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  migrate:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    environment:
+      KRIBU_ENVIRONMENT: development
+      KRIBU_DATABASE_URL: postgresql+asyncpg://${KRIBU_APP_DB_USER:-kribu_app}:${KRIBU_APP_DB_PASSWORD:-kribu_app_dev_only}@postgres:5432/${POSTGRES_DB:-kribu}
+      KRIBU_MIGRATION_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-kribu}:${POSTGRES_PASSWORD:-kribu_dev_only}@postgres:5432/${POSTGRES_DB:-kribu}
+    command: ["uv", "run", "--frozen", "--no-dev", "alembic", "upgrade", "head"]
+    depends_on:
+      db-bootstrap:
+        condition: service_completed_successfully
+    restart: "no"
+
+  keycloak-postgres:
+    image: postgres:18.1-bookworm
+    environment:
+      POSTGRES_DB: ${KEYCLOAK_DB:-keycloak}
+      POSTGRES_USER: ${KEYCLOAK_DB_USER:-keycloak}
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_dev_only}
+    volumes:
+      - kribu_keycloak_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${KEYCLOAK_DB_USER:-keycloak} -d ${KEYCLOAK_DB:-keycloak}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.0
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-kribu_admin_dev_only}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/${KEYCLOAK_DB:-keycloak}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER:-keycloak}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_dev_only}
+      KC_HOSTNAME: http://localhost:${KEYCLOAK_PORT:-8180}
+      KC_HEALTH_ENABLED: "true"
+      JAVA_OPTS_KC_HEAP: -XX:InitialRAMPercentage=30 -XX:MaxRAMPercentage=65
+      KRIBU_DEMO_MIKE_PASSWORD: ${KRIBU_DEMO_MIKE_PASSWORD:-mike_demo_only}
+      KRIBU_DEMO_HR_PASSWORD: ${KRIBU_DEMO_HR_PASSWORD:-hr_demo_only}
+      KRIBU_DEMO_MANAGER_PASSWORD: ${KRIBU_DEMO_MANAGER_PASSWORD:-manager_demo_only}
+      KRIBU_DEMO_EXTERNAL_PASSWORD: ${KRIBU_DEMO_EXTERNAL_PASSWORD:-external_demo_only}
+    ports:
+      - "${KEYCLOAK_PORT:-8180}:8080"
+    volumes:
+      - ./infra/keycloak:/opt/keycloak/data/import:ro
+    depends_on:
+      keycloak-postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bash",
+          "-c",
+          "exec 3<>/dev/tcp/127.0.0.1/9000; printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3; grep -q '200 OK' <&3",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+    mem_limit: 768m
+    restart: unless-stopped
+
   api:
     build:
       context: .
@@ -26,8 +115,12 @@ services:
     environment:
       KRIBU_ENVIRONMENT: development
       KRIBU_LOG_LEVEL: ${KRIBU_LOG_LEVEL:-INFO}
-      KRIBU_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-kribu}:${POSTGRES_PASSWORD:-kribu_dev_only}@postgres:5432/${POSTGRES_DB:-kribu}
+      KRIBU_DATABASE_URL: postgresql+asyncpg://${KRIBU_APP_DB_USER:-kribu_app}:${KRIBU_APP_DB_PASSWORD:-kribu_app_dev_only}@postgres:5432/${POSTGRES_DB:-kribu}
       KRIBU_CORS_ORIGINS: '["http://localhost:${WEB_PORT:-3000}"]'
+      KRIBU_OIDC_ISSUER_URL: http://localhost:${KEYCLOAK_PORT:-8180}/realms/kribu-demo
+      KRIBU_OIDC_JWKS_URL: http://keycloak:8080/realms/kribu-demo/protocol/openid-connect/certs
+      KRIBU_OIDC_AUDIENCE: kribu-api
+      KRIBU_OIDC_CLOCK_SKEW_SECONDS: ${KRIBU_OIDC_CLOCK_SKEW_SECONDS:-30}
       KRIBU_MODEL_PROVIDER: ${KRIBU_MODEL_PROVIDER:-gemini}
       KRIBU_MODEL_DATA_POLICY: ${KRIBU_MODEL_DATA_POLICY:-synthetic_only}
       KRIBU_GEMINI_API_KEY: ${KRIBU_GEMINI_API_KEY:-}
@@ -39,7 +132,9 @@ services:
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
-      postgres:
+      migrate:
+        condition: service_completed_successfully
+      keycloak:
         condition: service_healthy
     healthcheck:
       test:
@@ -81,4 +176,5 @@ services:
 
 volumes:
   kribu_postgres_data:
+  kribu_keycloak_postgres_data:
 

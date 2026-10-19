@@ -4,9 +4,9 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Current status
 
-- **Lifecycle:** Iteration 2 implementation, owner-reviewed and ready to commit.
-- **Active area:** Backend model-provider boundary and Gemini verification spike.
-- **Application code:** The committed scaffold is running; Gemini integration changes are live-verified with synthetic prompts and ready to commit.
+- **Lifecycle:** Iteration 3 implemented and live-verified; working tree is uncommitted pending owner review.
+- **Active area:** Keycloak identity, trusted request context, tenant schema, and PostgreSQL RLS.
+- **Application code:** Iteration 2 is committed and pushed; the identity and tenant boundary now works locally and is awaiting review.
 - **Selected stories:** NGO Project, HR Employee History, Client Complaint Patterns.
 - **Data:** Synthetic demo packs must be created; no client data sources are available.
 - **Cost constraint:** Demo uses free/open-source infrastructure and Gemini free-tier inference for synthetic data; no paid billing is enabled.
@@ -21,7 +21,8 @@ This is the current implementation handoff. Update it in every material implemen
 - The architecture decision was aligned to LangGraph rather than PydanticAI for durable product growth.
 - Iteration 1 was committed and pushed on `dev-v1.0.x`.
 - The Gemini decision and standalone web-container fix were committed and pushed.
-- Iteration 2 now has a typed `ModelProvider`, Gemini adapter, synthetic-only prompt contract, safe provider errors, structured output, streaming, function selection, usage/latency metadata, and a live verification command.
+- Iteration 2 was committed and pushed as `4d43182` with a typed `ModelProvider`, Gemini adapter, synthetic-only enforcement, structured output, streaming, function selection, metadata, and live verification.
+- Iteration 3 adds a pinned Keycloak realm, strict OIDC validation, tenant-scoped sessions, Alembic migrations, a restricted runtime database role, and forced PostgreSQL RLS.
 
 ## Current decisions
 
@@ -46,9 +47,9 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Current file/area being worked on
 
-- `services/api/app/ai`: provider contracts, Gemini adapter, configuration checks, and errors.
-- `services/api/scripts/verify_gemini.py`: explicit synthetic-only live provider spike.
-- `services/api/tests/test_model_provider.py`: focused provider-boundary checks.
+- `services/api/app/identity`: token validation, trusted identity contracts, and tenant session context.
+- `services/api/migrations`: tenant/user schema, synthetic profiles, and RLS policies.
+- `infra/keycloak` and `compose.yaml`: local identity service and repeatable realm import.
 
 ## Verification performed
 
@@ -62,20 +63,23 @@ This is the current implementation handoff. Update it in every material implemen
 - Docker Desktop is running; PostgreSQL, API, and standalone Next.js web containers are healthy.
 - Official Google Gen AI SDK documentation confirms `gemini-3.8-flash` supports structured output, streaming, and function calling.
 - Local adapter checks cover synthetic-only enforcement, missing/placeholder and production rejection, typed output metadata, streaming completion, and non-executing tool selection.
-- Ruff and mypy pass; 11 focused API/provider tests pass with one upstream TestClient deprecation warning; Compose configuration validates.
-- The rebuilt API returns readiness `200`; all three Docker services are running.
+- Ruff and mypy pass; 21 focused API/provider/identity tests pass with one upstream TestClient deprecation warning; Compose configuration validates.
+- The rebuilt API returns readiness `200`; the web, API, application database, Keycloak, and Keycloak database containers are healthy.
 - Live Gemini verification passed with synthetic prompts for structured output, streaming, and non-executing tool selection on `gemini-3.8-flash`.
+- Keycloak `26.8.0` starts healthy on local port `8180` with its dedicated PostgreSQL store and imports the synthetic realm.
+- The restricted `kribu_app` database role is created idempotently and Alembic applies the initial tenant migration.
+- Live OIDC verification succeeds for Mike and the second-tenant user; anonymous access returns `401`.
+- Live RLS verification returns zero tenants without context, exactly one matching tenant per context, and blocks a cross-tenant insert.
 
 ## Known open questions
 
 - Exact development machine CPU model and operating-system version.
-- Whether the live demo must work fully offline after initial setup.
+- Whether an offline model fallback is required for the live demo; Gemini itself requires internet access.
 - Target live-response latency.
-- Demo users and exact approval roles.
 
 ## Next step
 
-Commit and push Iteration 2 to `dev-v1.0.x`, then begin Iteration 3: the identity and tenant boundary.
+Present Iteration 3 for owner review and commit only after explicit approval. Iteration 4 then introduces OPA RBAC/ABAC policy decisions and audit records.
 
 ## Update template
 

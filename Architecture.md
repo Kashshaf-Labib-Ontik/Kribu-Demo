@@ -1,6 +1,6 @@
 # KRIBU Demo Architecture
 
-**Status:** Proposed implementation architecture
+**Status:** Active implementation architecture through Iteration 3
 
 **Primary orchestration:** LangGraph
 
@@ -185,6 +185,12 @@ The demo uses Gemini through the official `google-genai` SDK and a `ModelProvide
 
 The provider adapter must implement structured output, bounded retries for quota responses, timeout handling, model/version logging, and a clear `provider_unavailable` error. LangGraph, Guard, Brain, citations, and deterministic calculations must not depend on Gemini-specific APIs.
 
+### Identity and tenant boundary
+
+Keycloak `26.8.0` runs locally with a dedicated PostgreSQL store and imports the versioned `kribu-demo` realm. Access tokens use the browser-visible issuer while the containerized API reads signing keys from Keycloak's internal JWKS endpoint. FastAPI accepts only RS256 tokens with the expected issuer, `kribu-api` audience, expiry, subject, tenant UUID, and realm roles.
+
+The API derives `CurrentUser` exclusively from verified claims. Every tenant-scoped SQLAlchemy transaction sets `app.tenant_id` and `app.user_id` locally before querying. The runtime connects as the non-superuser, non-`BYPASSRLS` `kribu_app` role; Alembic runs separately with the database owner. PostgreSQL RLS is enabled and forced on tenant-owned tables, so a missing tenant context returns no rows and cross-tenant writes fail.
+
 ## 8. Monorepo structure
 
 ```text
@@ -258,6 +264,7 @@ Every tenant-owned table carries `tenant_id`. Source-derived rows carry `documen
 - `GET /v1/approvals`, `POST /v1/approvals/{id}/decision`
 - `GET /v1/skills`, administration endpoints for demo metadata/policies
 - `GET /v1/audit-events`
+- `GET /v1/identity/me` returns the authenticated, provisioned demo identity and trusted tenant context.
 
 Errors use a stable problem-details envelope with a safe message, machine code, correlation ID, and retryability. Internal prompts, stack traces, secrets, and inaccessible resource details are never returned.
 
