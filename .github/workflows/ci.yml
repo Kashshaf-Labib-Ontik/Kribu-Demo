@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "dev-*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint, typecheck, unit tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.22"
+      - run: pnpm install --frozen-lockfile
+      - run: uv sync --frozen
+      - run: pnpm check
+
+  policy:
+    name: OPA policy tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: opa test
+        run: >-
+          docker run --rm
+          -v "${{ github.workspace }}/policies:/policies:ro"
+          openpolicyagent/opa:1.21.2
+          test --fail-on-empty /policies/rego /policies/tests
+
+  integration:
+    name: Integration (PostgreSQL + OPA)
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.7-pg18-bookworm
+        env:
+          POSTGRES_DB: kribu
+          POSTGRES_USER: kribu
+          POSTGRES_PASSWORD: kribu_dev_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kribu -d kribu"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PGPASSWORD: kribu_dev_only
+      KRIBU_TEST_OWNER_DATABASE_URL: postgresql://kribu:kribu_dev_only@localhost:5432/kribu
+      KRIBU_TEST_APP_DB_PASSWORD: kribu_app_dev_only
+      KRIBU_TEST_OPA_URL: http://localhost:8181
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.22"
+      - run: uv sync --frozen
+      - name: Bootstrap runtime role
+        run: >-
+          psql -v ON_ERROR_STOP=1
+          -v app_user=kribu_app
+          -v app_password=kribu_app_dev_only
+          -v app_database=kribu
+          -h localhost -U kribu -d kribu
+          -f infra/compose/postgres/bootstrap/001_app_role.sql
+      - name: Start OPA
+        run: |
+          docker run -d --name opa -p 8181:8181 \
+            -v "${{ github.workspace }}/policies/rego:/policies:ro" \
+            openpolicyagent/opa:1.21.2 run --server --addr=0.0.0.0:8181 /policies
+          curl --silent --show-error --retry 20 --retry-delay 1 --retry-all-errors \
+            http://localhost:8181/health
+      - name: Integration tests
+        run: uv run --package kribu-api pytest -m integration --integration

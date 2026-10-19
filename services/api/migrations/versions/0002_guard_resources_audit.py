@@ -1,5 +1,7 @@
 """Add canonical resource attributes, ACL grants, demo content, and decision audit.
 
+Schema only. Synthetic demo rows are inserted by ``scripts/seed_demo.py``.
+
 Revision ID: 0002_guard_resources
 Revises: 0001_identity_tenant
 Create Date: 2026-10-19
@@ -15,13 +17,6 @@ revision: str = "0002_guard_resources"
 down_revision: str | None = "0001_identity_tenant"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
-
-DEMO_TENANT = "11111111-1111-4111-8111-111111111111"
-OTHER_TENANT = "22222222-2222-4222-8222-222222222222"
-SALARY = "10000000-0000-4000-8000-000000000001"
-ENGINEERING = "10000000-0000-4000-8000-000000000002"
-NGO = "10000000-0000-4000-8000-000000000003"
-OTHER = "10000000-0000-4000-8000-000000000004"
 
 
 def _enable_tenant_rls(table_name: str, *, audit: bool = False) -> None:
@@ -51,13 +46,12 @@ def _enable_tenant_rls(table_name: str, *, audit: bool = False) -> None:
                 f"WITH CHECK (tenant_id = {tenant_setting})"
             )
         )
-        op.execute(
-            sa.text(f'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "{table_name}" TO kribu_app')
-        )
+        # Authorization metadata is read-only at runtime; feature migrations grant writes.
+        op.execute(sa.text(f'GRANT SELECT ON TABLE "{table_name}" TO kribu_app'))
 
 
 def upgrade() -> None:
-    descriptors = op.create_table(
+    op.create_table(
         "resource_descriptors",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
@@ -71,7 +65,7 @@ def upgrade() -> None:
     )
     op.create_index("ix_resource_descriptors_tenant_id", "resource_descriptors", ["tenant_id"])
 
-    grants = op.create_table(
+    op.create_table(
         "resource_acl_grants",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
@@ -88,7 +82,7 @@ def upgrade() -> None:
     op.create_index("ix_resource_acl_grants_tenant_id", "resource_acl_grants", ["tenant_id"])
     op.create_index("ix_resource_acl_grants_resource_id", "resource_acl_grants", ["resource_id"])
 
-    content = op.create_table(
+    op.create_table(
         "demo_resource_content",
         sa.Column("resource_id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
@@ -112,6 +106,7 @@ def upgrade() -> None:
         sa.Column("reason_code", sa.String(80), nullable=False),
         sa.Column("policy_version", sa.String(80)),
         sa.Column("correlation_id", sa.String(128), nullable=False),
+        sa.Column("request_id", sa.String(64)),
         sa.Column("input_metadata", postgresql.JSONB(), nullable=False),
         sa.Column(
             "created_at",
@@ -122,113 +117,6 @@ def upgrade() -> None:
     )
     op.create_index(
         "ix_authorization_audit_events_tenant_id", "authorization_audit_events", ["tenant_id"]
-    )
-
-    op.bulk_insert(
-        descriptors,
-        [
-            {
-                "id": SALARY,
-                "tenant_id": DEMO_TENANT,
-                "resource_type": "employee_record",
-                "classification": "restricted_hr",
-                "department": "human-resources",
-                "owner_subject_id": "roger-synthetic",
-                "title": "Synthetic Roger Albert salary revision",
-            },
-            {
-                "id": ENGINEERING,
-                "tenant_id": DEMO_TENANT,
-                "resource_type": "team_record",
-                "classification": "internal",
-                "department": "engineering",
-                "owner_subject_id": None,
-                "title": "Synthetic engineering handbook",
-            },
-            {
-                "id": NGO,
-                "tenant_id": DEMO_TENANT,
-                "resource_type": "project_report",
-                "classification": "internal",
-                "department": "programs",
-                "owner_subject_id": None,
-                "title": "Synthetic NGO progress note",
-            },
-            {
-                "id": OTHER,
-                "tenant_id": OTHER_TENANT,
-                "resource_type": "team_record",
-                "classification": "internal",
-                "department": "engineering",
-                "owner_subject_id": None,
-                "title": "Synthetic second-tenant handbook",
-            },
-        ],
-    )
-    op.bulk_insert(
-        grants,
-        [
-            {
-                "id": "20000000-0000-4000-8000-000000000001",
-                "tenant_id": DEMO_TENANT,
-                "resource_id": SALARY,
-                "principal_type": "role",
-                "principal_id": "hr_manager",
-                "action": "resource.read",
-            },
-            {
-                "id": "20000000-0000-4000-8000-000000000002",
-                "tenant_id": DEMO_TENANT,
-                "resource_id": ENGINEERING,
-                "principal_type": "department",
-                "principal_id": "engineering",
-                "action": "resource.read",
-            },
-            {
-                "id": "20000000-0000-4000-8000-000000000003",
-                "tenant_id": DEMO_TENANT,
-                "resource_id": NGO,
-                "principal_type": "department",
-                "principal_id": "programs",
-                "action": "resource.read",
-            },
-            {
-                "id": "20000000-0000-4000-8000-000000000004",
-                "tenant_id": OTHER_TENANT,
-                "resource_id": OTHER,
-                "principal_type": "department",
-                "principal_id": "engineering",
-                "action": "resource.read",
-            },
-        ],
-    )
-    op.bulk_insert(
-        content,
-        [
-            {
-                "resource_id": SALARY,
-                "tenant_id": DEMO_TENANT,
-                "content": (
-                    "SYNTHETIC ONLY: Roger Albert salary revision, "
-                    "BDT 145,000 per month. This is fictional demo data."
-                ),
-            },
-            {
-                "resource_id": ENGINEERING,
-                "tenant_id": DEMO_TENANT,
-                "content": "SYNTHETIC ONLY: Engineering handbook for the KRIBU demo tenant.",
-            },
-            {
-                "resource_id": NGO,
-                "tenant_id": DEMO_TENANT,
-                "content": "SYNTHETIC ONLY: NGO program progress note for the KRIBU demo tenant.",
-            },
-            {
-                "resource_id": OTHER,
-                "tenant_id": OTHER_TENANT,
-                "content": "SYNTHETIC ONLY: Engineering handbook for the isolation tenant.",
-            },
-        ],
     )
 
     for table_name in ("resource_descriptors", "resource_acl_grants", "demo_resource_content"):

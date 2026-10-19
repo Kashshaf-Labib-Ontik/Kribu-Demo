@@ -4,9 +4,9 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Current status
 
-- **Lifecycle:** Iterations 0-3 are committed and pushed. Iteration 4 is implemented and live-verified in the working tree, pending owner review.
-- **Active area:** Guard review and handoff; document upload is the next implementation slice.
-- **Application code:** Keycloak identity and RLS are committed; OPA RBAC/ABAC, protected synthetic resource access, and authorization audit are uncommitted.
+- **Lifecycle:** Iterations 0-4 are committed (Iteration 4 as `c38d543`). Pre-Iteration 5 hardening (engineering review D1-D22) is in progress; Group 1 "Harden test harness and CI" is in the working tree, pending owner review.
+- **Active area:** Hardening Groups 1-3 (safety net, error/logging boundaries, Guard `authorize()` refactor), then Iteration 5 document upload per the reviewed plan.
+- **Application code:** Keycloak identity, RLS, OPA RBAC/ABAC, protected synthetic resource access, and append-only authorization audit are committed.
 - **Selected stories:** NGO Project, HR Employee History, Client Complaint Patterns.
 - **Data:** Synthetic demo packs must be created; no client data sources are available.
 - **Cost constraint:** Demo uses free/open-source infrastructure and Gemini free-tier inference for synthetic data; no paid billing is enabled.
@@ -23,7 +23,8 @@ This is the current implementation handoff. Update it in every material implemen
 - The Gemini decision and standalone web-container fix were committed and pushed.
 - Iteration 2 was committed and pushed as `4d43182` with a typed `ModelProvider`, Gemini adapter, synthetic-only enforcement, structured output, streaming, function selection, metadata, and live verification.
 - Iteration 3 was committed and pushed as `62a3c5c` with a pinned Keycloak realm, strict OIDC validation, tenant-scoped sessions, Alembic migrations, a restricted runtime database role, and forced PostgreSQL RLS.
-- Iteration 4 implementation adds pinned OPA `1.21.2`, `guard-v1` Rego policy, canonical subject/resource/action inputs, ACL metadata, synthetic proof content, and tenant-scoped append-only runtime audit. It awaits owner review before commit.
+- Iteration 4 was committed as `c38d543` with pinned OPA `1.21.2`, `guard-v1` Rego policy, canonical subject/resource/action inputs, ACL metadata, synthetic proof content, and tenant-scoped append-only runtime audit.
+- Hardening Group 1 (uncommitted): hermetic test settings; schema-only migrations plus idempotent `scripts/seed_demo.py` and a Compose `seed` service; runtime role read-only on identity and authorization tables (insert-only on audit); audit `request_id` column; integration suite (`pnpm test:integration`, real PostgreSQL + OPA); `pnpm test:policy`; GitHub Actions CI.
 
 ## Current decisions
 
@@ -85,7 +86,7 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Next step
 
-Owner reviews the uncommitted Iteration 4 Guard slice. After approval, commit with a concise message; then begin Iteration 5 document upload and versioning.
+Owner reviews hardening Group 1 and approves its commit (`Harden test harness and CI`). Then Group 2 (`Unify API errors and logging`), Group 3 (`Extract Guard authorization step`), and Iteration 5 (`Add document upload lifecycle`). Local databases created before Group 1 need one `docker compose down -v`. On this machine a native PostgreSQL holds host port 5432, so local integration runs point `KRIBU_TEST_OWNER_DATABASE_URL` at the Compose port.
 
 ## Update template
 

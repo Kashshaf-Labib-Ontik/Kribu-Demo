@@ -44,7 +44,9 @@ Start the complete local foundation:
 docker compose up --build
 ```
 
-The Studio runs at `http://localhost:3000`, the API at `http://localhost:8000`, Keycloak at `http://localhost:8180`, and API documentation at `http://localhost:8000/docs` in development. Compose also runs OPA internally, bootstraps the restricted API database role, applies Alembic migrations, and imports the synthetic Keycloak realm.
+The Studio runs at `http://localhost:3000`, the API at `http://localhost:8000`, Keycloak at `http://localhost:8180`, and API documentation at `http://localhost:8000/docs` in development. Compose also runs OPA internally, bootstraps the restricted API database role, applies schema-only Alembic migrations, seeds the synthetic demo rows (`scripts/seed_demo.py`, idempotent, run as the schema owner), and imports the synthetic Keycloak realm.
+
+Migrations no longer insert demo rows and the runtime role is read-only on authorization data. A database created before this change still holds the old rows and grants, so recreate the local volumes once: `docker compose down -v` (synthetic data only), then `docker compose up --build`.
 
 Add a Google AI Studio key to your uncommitted `.env` as `KRIBU_GEMINI_API_KEY`. Verify structured output, streaming, usage metadata, and function selection with the script's built-in synthetic prompts:
 
@@ -80,7 +82,7 @@ The protected API is `GET /v1/demo/resources/{resource_id}`. Seeded IDs are in `
 For faster application development, run PostgreSQL in Docker and the applications on the host:
 
 ```powershell
-docker compose up -d postgres db-bootstrap migrate keycloak-postgres keycloak opa
+docker compose up -d postgres db-bootstrap migrate seed keycloak-postgres keycloak opa
 uv run --package kribu-api uvicorn app.main:app --app-dir services/api --reload
 pnpm dev:web
 ```
@@ -89,9 +91,20 @@ Run the focused scaffold checks:
 
 ```powershell
 pnpm check
+pnpm test:policy
 pnpm build:web
 docker compose config --quiet
 ```
+
+Run the integration suite (real PostgreSQL RLS and grants, real OPA, test-signed tokens). It recreates a dedicated `kribu_test` database on the Compose PostgreSQL and never touches `kribu`. Compose OPA has no host port, so start a throwaway OPA for the tests:
+
+```powershell
+docker run -d --rm --name kribu-opa-test -p 127.0.0.1:8181:8181 -v ./policies/rego:/policies:ro openpolicyagent/opa:1.21.2 run --server --addr=0.0.0.0:8181 /policies
+pnpm test:integration
+docker stop kribu-opa-test
+```
+
+Overrides: `KRIBU_TEST_OWNER_DATABASE_URL` (default `postgresql://kribu:kribu_dev_only@localhost:5432/kribu`), `KRIBU_TEST_APP_DB_PASSWORD` and `KRIBU_TEST_OPA_URL`. If another PostgreSQL already listens on host port 5432, set `POSTGRES_PORT` for Compose and point `KRIBU_TEST_OWNER_DATABASE_URL` at that port. CI (`.github/workflows/ci.yml`) runs the checks, policy tests and integration suite on every push.
 
 ## Current status
 

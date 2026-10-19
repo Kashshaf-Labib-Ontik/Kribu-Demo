@@ -28,7 +28,11 @@ package = false
 
 [tool.pytest.ini_options]
 addopts = "-q"
-testpaths = ["services/api/tests"]
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = [
+    "integration: needs PostgreSQL and OPA; runs only with KRIBU_INTEGRATION=1",
+]
 
 [tool.ruff]
 line-length = 100
