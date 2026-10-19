@@ -8,7 +8,7 @@ Build in short vertical iterations. Each iteration ends with a runnable behavior
 
 - **One experienced full-stack/AI developer:** approximately 8-10 weeks full-time.
 - **Two developers with clear web/platform ownership:** approximately 5-7 weeks.
-- Add 1-2 weeks if the development machine cannot run a suitable local model or document parsing needs extensive OCR tuning.
+- Add 1-2 weeks if Gemini quota limits, API reliability, or document parsing needs extensive tuning.
 
 This is a planning range, not a deadline. It assumes synthetic data, three stories, no live connectors, and prompt evaluation rather than model training.
 
@@ -17,7 +17,7 @@ This is a planning range, not a deadline. It assumes synthetic data, three stori
 | Phase | Typical duration | Outcome | Exit gate |
 |---|---:|---|---|
 | 0. Alignment and repository | 1-2 days | Living requirements, architecture, rules, design, delivery plan | Scope and open decisions reviewed |
-| 1. Technical spike and scaffold | 3-5 days | Monorepo, Compose, web/API, PostgreSQL/pgvector, local model benchmark | One typed model call and health flow work locally |
+| 1. Technical spike and scaffold | 3-5 days | Monorepo, Compose, web/API, PostgreSQL/pgvector, Gemini configuration | One typed model call and health flow work locally |
 | 2. Guard foundation | 4-6 days | Keycloak, tenant context, OPA RBAC/ABAC, RLS, audit decisions | Unauthorized salary and cross-tenant tests deny before retrieval |
 | 3. Brain foundation | 7-10 days | Upload, versioning, parsing, provenance, indexing, authorized hybrid search | A cited page/cell can be retrieved and previewed safely |
 | 4. Engine vertical slice | 6-8 days | Durable LangGraph, SSE, checkpoints, typed extraction, citations | NGO golden query works end to end |
@@ -41,12 +41,13 @@ The commit messages below are targets and may be adjusted to match the actual sl
 - Add web/API/PostgreSQL health checks and repeatable bootstrap commands.
 - **Commit:** `Scaffold local development stack`
 
-### Iteration 2 - Local AI feasibility spike
+### Iteration 2 - Gemini provider and structured-output spike
 
-- Detect reference hardware and benchmark two appropriately sized local instruct models.
-- Verify structured Pydantic output, tool calling, streaming, and local embeddings.
-- Record quality, first-token latency, total latency, and RAM/VRAM; select configuration, not a hard dependency.
-- **Commit:** `Benchmark local inference providers`
+- Configure the official Gemini SDK through a backend-only `ModelProvider` adapter.
+- Verify structured Pydantic output, bounded retries, streaming where supported, and one tool/function call using synthetic prompts.
+- Record model, quota response, latency, token usage, and failure behavior; keep the model configurable.
+- Add a hard synthetic-data policy and prevent accidental use of a missing/production credential.
+- **Commit:** `Integrate Gemini demo provider`
 
 ### Iteration 3 - Identity and tenant boundary
 
@@ -132,7 +133,7 @@ Create expected facts before tuning prompts.
 2. OIDC/JWT, Keycloak, RBAC, ABAC, OPA/Rego, RLS, and document ACLs.
 3. Embeddings, chunking, hybrid retrieval, reranking, provenance, and prompt injection.
 4. LangGraph state, nodes, tools, checkpoints, interrupts, streaming, retries, and idempotency.
-5. Docling/openpyxl extraction, local inference through Ollama, and structured outputs.
+5. Docling/openpyxl extraction, Gemini structured outputs, provider adapters, and prompt-injection controls.
 6. OpenTelemetry, golden datasets, retrieval/citation evaluation, and demo operations.
 
 Use a small working exercise for each topic rather than completing long courses before writing any code.
@@ -141,7 +142,7 @@ Use a small working exercise for each topic rather than completing long courses 
 
 | Risk | Effect | Mitigation / early proof |
 |---|---|---|
-| Local model is too slow or weak | Poor live demo and extraction quality | Hardware benchmark in Iteration 2; use smaller graphs/prompts and deterministic extraction; keep provider adapter |
+| Gemini quota, outage, or policy change | Demo interruption or unavailable inference | Bound retries, show provider status, cache/replay synthetic fixtures, keep provider adapter and optional Ollama fallback |
 | Document layouts lose provenance | Incorrect citations | Build representative PDFs/XLSX early; keep immutable locators; preview exact evidence |
 | Authorization is applied after search | Sensitive leakage | Policy and SQL/RLS gates before retrieval; mandatory negative tests |
 | Generic schemas become domain-specific | Difficult client onboarding | Canonical metadata plus versioned client mapping/adapters; no hard-coded names |

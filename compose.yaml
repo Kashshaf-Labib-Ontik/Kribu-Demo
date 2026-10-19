@@ -28,6 +28,11 @@ services:
       KRIBU_LOG_LEVEL: ${KRIBU_LOG_LEVEL:-INFO}
       KRIBU_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-kribu}:${POSTGRES_PASSWORD:-kribu_dev_only}@postgres:5432/${POSTGRES_DB:-kribu}
       KRIBU_CORS_ORIGINS: '["http://localhost:${WEB_PORT:-3000}"]'
+      KRIBU_MODEL_PROVIDER: ${KRIBU_MODEL_PROVIDER:-gemini}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
+      GEMINI_MAX_OUTPUT_TOKENS: ${GEMINI_MAX_OUTPUT_TOKENS:-4096}
+      GEMINI_TEMPERATURE: ${GEMINI_TEMPERATURE:-0.1}
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:

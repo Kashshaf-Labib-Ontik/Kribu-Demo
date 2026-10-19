@@ -9,8 +9,8 @@ This is the current implementation handoff. Update it in every material implemen
 - **Application code:** Next.js Studio shell and FastAPI foundation implemented in the working tree; not committed.
 - **Selected stories:** NGO Project, HR Employee History, Client Complaint Patterns.
 - **Data:** Synthetic demo packs must be created; no client data sources are available.
-- **Cost constraint:** Demo uses only locally runnable free/open-source components and requires no card.
-- **Reference hardware:** 16 GB total system RAM with integrated Intel UHD graphics using shared memory; use a CPU-first model benchmark.
+- **Cost constraint:** Demo uses free/open-source infrastructure and Gemini free-tier inference for synthetic data; no paid billing is enabled.
+- **Reference hardware:** 16 GB total system RAM with integrated Intel UHD graphics using shared memory; do not require local LLM inference.
 
 ## Completed
 
@@ -29,7 +29,8 @@ This is the current implementation handoff. Update it in every material implemen
 - Pydantic owns typed contracts; deterministic code owns policy, math, validation, and side effects.
 - Authorization uses RBAC + ABAC + document ACLs + RLS. Vector search and LLM reasoning do not grant access.
 - Brain uses provenance-aware Docling/openpyxl extraction and authorized hybrid PostgreSQL retrieval.
-- Local inference is accessed through a provider interface, initially Ollama. The default instruct/embedding models are selected after a hardware benchmark.
+- Gemini free-tier inference through the official Google SDK is the demo default. It is backend-only, configurable, quota-aware, and restricted to synthetic data.
+- `ModelProvider` remains the boundary; Ollama is optional future fallback for offline/private deployments.
 - Local filesystem is the demo object store behind an adapter; hosted object storage is deferred.
 - All proposed external actions remain drafts behind human approval during the demo.
 - Testing stays focused on security, retrieval, citations, graph behavior, API integration, goldens, and four browser journeys.
@@ -38,7 +39,7 @@ This is the current implementation handoff. Update it in every material implemen
 ## Superseded source decisions
 
 - Earlier documentation naming PydanticAI as the orchestrator is superseded by LangGraph plus Pydantic contracts.
-- Earlier documentation naming a paid OpenAI model is superseded for the demo by local inference.
+- Earlier documentation naming a paid OpenAI model or local Ollama as demo default is superseded by Gemini free-tier inference.
 - Earlier scope covering all five stories is narrowed to NGO, HR, and Client Servicing.
 
 ## Current file/area being worked on
@@ -56,7 +57,7 @@ This is the current implementation handoff. Update it in every material implemen
 - Three focused API health/correlation/readiness tests pass; the current FastAPI test client emits one upstream deprecation warning.
 - Host-level smoke test passes: liveness `200`, web `200` with API available, and readiness safely returns `503` while PostgreSQL is absent.
 - JavaScript and Python frozen lockfile checks pass; Docker Compose configuration validates.
-- Docker Compose runtime is not yet verified because Docker Desktop is not running.
+- Docker Desktop is now running; PostgreSQL and API are healthy. Web was restarting because its runtime image invoked pnpm as a non-writable user; the standalone-server Dockerfile fix is part of this uncommitted update.
 
 ## Known open questions
 
@@ -67,7 +68,7 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Next step
 
-Complete Iteration 1 validation and present the uncommitted diff for owner review. Commit and push only after explicit approval; then begin the local inference benchmark iteration.
+Complete the web container fix and present the Gemini decision/documentation update for owner review. Commit and push only after explicit approval; then begin the Gemini provider spike.
 
 ## Update template
 

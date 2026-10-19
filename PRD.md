@@ -147,8 +147,9 @@ The demo is accepted when:
 
 - English-first; data structures remain Unicode and Bangla-ready.
 - One demo tenant is sufficient, but tenant isolation is implemented from the first schema.
-- Reference development hardware has 16 GB total system RAM and integrated Intel UHD graphics using shared memory. Treat local inference as CPU-focused until benchmarking proves otherwise.
-- Local model quality and latency depend on the exact CPU and available shared memory; a benchmark spike selects the default model.
+- Reference development hardware has 16 GB total system RAM and integrated Intel UHD graphics using shared memory. The demo therefore uses Gemini free-tier inference instead of requiring local LLM inference.
+- All provider calls remain behind a replaceable interface so a future private or self-hosted provider can be introduced without changing skills or graphs.
+- Gemini free-tier calls are restricted to synthetic demo data; real client information is prohibited because Google may use unpaid-service content for product improvement and human review.
 - Synthetic data must be designed together with expected answers before prompt tuning.
 - Client schemas and connectors are placeholders until discovery after demo approval.
 

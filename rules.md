@@ -15,7 +15,7 @@ These rules apply to implementation, review, and generated code. Security and da
 
 ## 2. Component boundaries
 
-- Studio calls the API only. It never connects directly to PostgreSQL, OPA, Keycloak administration, Ollama, or storage.
+- Studio calls the API only. It never connects directly to PostgreSQL, OPA, Keycloak administration, Gemini, Ollama, or storage.
 - Route handlers authenticate, validate, delegate, and map errors; application services own use cases.
 - LangGraph nodes call typed tools/services. They never execute arbitrary SQL, shell commands, or unrestricted filesystem operations.
 - Brain accepts an `AuthorizationScope`; it cannot perform an unscoped search.
@@ -45,8 +45,11 @@ These rules apply to implementation, review, and generated code. Security and da
 - Clearly label inference, calculation, missing evidence, conflicting evidence, and direct quotation.
 - Use bounded retries and bounded graph loops. On exhaustion, return a partial qualified result.
 - Keep prompts and skills versioned. Record model, parameters, prompt/skill version, and retrieved evidence per run.
-- Never fine-tune on client data during the demo and never send data to an external model by default.
-- Do not add Mem0, a graph database, an agent swarm, or autonomous browser/code execution without an accepted use case and evaluation.
+- Use Gemini free-tier inference only for synthetic demo data. Never send real client, salary, HR, complaint, or confidential organizational data to it.
+- Keep the Gemini API key server-side and outside Git; never expose it in browser variables, logs, traces, prompts, screenshots, or errors.
+- Put Gemini behind `ModelProvider`; enforce timeouts, bounded exponential backoff for 429/5xx responses, token limits, and provider-specific error mapping.
+- Never fine-tune on client data during the demo and never silently fall back from an approved private provider to a free external provider.
+- Do not add Mem0, a graph database, an agent swarm, autonomous browser/code execution, or an unapproved model provider without an accepted use case and evaluation.
 
 ## 5. Retrieval and provenance
 

@@ -163,7 +163,8 @@ All demo services are self-hosted and usable without a paid account.
 | Web | Next.js, React, TypeScript, Tailwind CSS, shadcn/ui, TanStack Query | Self-hosted; REST and SSE client |
 | API | Python, FastAPI, Pydantic, SQLAlchemy, Alembic | Modular monolith with typed contracts |
 | Workflow | LangGraph OSS | Durable graphs, checkpoints, streaming, interrupts |
-| Local inference | Ollama behind `ModelProvider` | Default model chosen by local hardware benchmark |
+| Model inference | Google AI Studio Gemini free tier behind `ModelProvider` | Demo default; synthetic data only; model and provider remain configurable |
+| Fallback inference | Ollama adapter (optional) | Not required for the demo; useful for offline/private deployments later |
 | Embeddings/reranking | Sentence Transformers with BGE-family open models | Local, configurable, multilingual-capable |
 | Parsing | Docling; openpyxl for exact spreadsheet provenance | RapidOCR/Tesseract when OCR is required |
 | Database/search | PostgreSQL + pgvector | Relational data, full-text search, vectors, RLS |
@@ -174,9 +175,15 @@ All demo services are self-hosted and usable without a paid account.
 | Observability | Structured logs + OpenTelemetry | Langfuse FOSS is an optional local Compose profile |
 | Testing | pytest, Vitest only where useful, Playwright smoke tests | Security, retrieval, citations, graphs, and three journeys |
 | Tooling | uv, pnpm, Ruff, mypy, ESLint, Prettier | Versions pinned after the scaffold spike |
-| Runtime | Docker Compose | No hosted runtime required for the demo |
+| Runtime | Docker Compose | API/web/database local; Gemini is the only external inference dependency |
 
-References: [LangGraph persistence](https://docs.langchain.com/oss/python/langgraph/persistence), [OPA](https://www.openpolicyagent.org/docs), [Docling formats](https://docling-project.github.io/docling/usage/supported_formats/), [pgvector](https://github.com/pgvector/pgvector), [Keycloak](https://www.keycloak.org/), and [Next.js self-hosting](https://nextjs.org/docs/app/guides/self-hosting).
+References: [LangGraph persistence](https://docs.langchain.com/oss/python/langgraph/persistence), [OPA](https://www.openpolicyagent.org/docs), [Docling formats](https://docling-project.github.io/docling/usage/supported_formats/), [pgvector](https://github.com/pgvector/pgvector), [Keycloak](https://www.keycloak.org/), [Next.js self-hosting](https://nextjs.org/docs/app/guides/self-hosting), and [Gemini API billing/data terms](https://ai.google.dev/gemini-api/docs/billing/).
+
+### Gemini demo boundary
+
+The demo uses Gemini through the official `google-genai` SDK and a `ModelProvider` adapter. The API key is read only by the backend, never exposed to the browser, and never committed. Requests contain synthetic demo documents only. Google documents that unpaid Gemini API/AI Studio content may be used to improve products and may be reviewed by humans; therefore real salary, HR, customer, or client-confidential data is prohibited on this provider. Production use requires an approved paid/private data-processing arrangement or a self-hosted provider.
+
+The provider adapter must implement structured output, bounded retries for quota responses, timeout handling, model/version logging, and a clear `provider_unavailable` error. LangGraph, Guard, Brain, citations, and deterministic calculations must not depend on Gemini-specific APIs.
 
 ## 8. Monorepo structure
 
@@ -257,7 +264,8 @@ Errors use a stable problem-details envelope with a safe message, machine code, 
 
 - Add client-specific source adapters through the `Connector` interface after discovery.
 - Replace local filesystem storage with an object-store adapter when deployment needs it.
-- Benchmark hosted and local model providers without changing graph or skill contracts.
+- Replace Gemini free-tier access with an approved paid/private model provider or self-hosted model before any real client data is connected.
+- Benchmark alternate providers without changing graph or skill contracts.
 - Add approval-backed external actions using narrow OAuth scopes and idempotency keys.
 - Add dedicated tenant deployment, HA, backups, and infrastructure-as-code only for the chosen environment.
 - Introduce a separate graph database only if measured relationship queries exceed PostgreSQL's practical boundary.
