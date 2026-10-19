@@ -6,6 +6,7 @@ requires-python = ">=3.11,<3.12"
 dependencies = [
     "asyncpg>=0.31.0,<1",
     "fastapi>=0.119.0,<1",
+    "google-genai>=1.75.0,<2",
     "pydantic-settings>=2.11.0,<3",
     "sqlalchemy[asyncio]>=2.0.44,<3",
     "uvicorn[standard]>=0.37.0,<1",

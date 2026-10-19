@@ -10,7 +10,7 @@ The first demo implements three reusable vertical slices using synthetic data:
 2. HR — reconstruct an employee's service, salary, and benefit history.
 3. Client Servicing — find recurring complaint patterns and service gaps.
 
-The demo must run locally with free and open-source software. Client data connectors and paid cloud/model services are outside the demo scope.
+The demo runs locally except for Gemini free-tier inference. Only built-in or synthetic demo data may be sent to Gemini; client data connectors and paid services are outside the demo scope.
 
 ## Planning documents
 
@@ -46,6 +46,16 @@ docker compose up --build
 
 The Studio runs at `http://localhost:3000`, the API at `http://localhost:8000`, and API documentation at `http://localhost:8000/docs` in development.
 
+Add a Google AI Studio key to your uncommitted `.env` as `KRIBU_GEMINI_API_KEY`. Verify structured output, streaming, usage metadata, and function selection with the script's built-in synthetic prompts:
+
+```powershell
+Set-Location services/api
+uv run python -m scripts.verify_gemini --confirm-synthetic
+Set-Location ../..
+```
+
+The command refuses placeholder/missing credentials and production mode. It declares a demo tool but does not execute it.
+
 For faster application development, run PostgreSQL in Docker and the applications on the host:
 
 ```powershell
@@ -64,4 +74,4 @@ docker compose config --quiet
 
 ## Current status
 
-Iteration 1 is under review. The uncommitted scaffold currently provides the Next.js Studio shell, FastAPI health endpoints, PostgreSQL/pgvector Compose service, locked dependencies, and focused checks.
+Iteration 2 is implemented and live-verified with synthetic Gemini prompts. The backend now has a Gemini provider boundary with synthetic-data enforcement, structured output, streaming, tool selection, safe provider errors, and focused tests.

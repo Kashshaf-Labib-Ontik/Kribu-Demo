@@ -4,7 +4,7 @@
 
 **Primary orchestration:** LangGraph
 
-**Deployment for demo:** Local Docker Compose and locally hosted models
+**Deployment for demo:** Local Docker Compose with external Gemini free-tier inference
 
 ## 1. Architecture principles
 
@@ -27,7 +27,7 @@ flowchart LR
     E --> B[KRIBU Brain\nIngestion + Retrieval + Memory]
     B --> DB[(PostgreSQL + pgvector)]
     B --> OBJ[(Versioned object store)]
-    E --> L[Local LLM and embeddings]
+    E --> L[Gemini via ModelProvider]
     E --> A[Artifacts and approvals]
     A --> S
     API --> AUD[(Audit events)]
@@ -196,6 +196,7 @@ Kribu-Demo/
 |   |   |-- app/
 |   |   |   |-- api/                # HTTP/SSE routes and dependencies
 |   |   |   |-- core/               # config, errors, logging, transactions
+|   |   |   |-- ai/                 # model-provider contracts and adapters
 |   |   |   |-- identity/           # OIDC context and tenant resolution
 |   |   |   |-- policy/             # OPA client and authorization service
 |   |   |   |-- documents/          # metadata, versions, upload lifecycle

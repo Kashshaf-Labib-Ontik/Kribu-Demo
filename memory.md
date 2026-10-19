@@ -4,9 +4,9 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Current status
 
-- **Lifecycle:** Iteration 1 implementation, awaiting owner review.
-- **Active area:** Local monorepo scaffold and health flow.
-- **Application code:** Next.js Studio shell and FastAPI foundation implemented in the working tree; not committed.
+- **Lifecycle:** Iteration 2 implementation, owner-reviewed and ready to commit.
+- **Active area:** Backend model-provider boundary and Gemini verification spike.
+- **Application code:** The committed scaffold is running; Gemini integration changes are live-verified with synthetic prompts and ready to commit.
 - **Selected stories:** NGO Project, HR Employee History, Client Complaint Patterns.
 - **Data:** Synthetic demo packs must be created; no client data sources are available.
 - **Cost constraint:** Demo uses free/open-source infrastructure and Gemini free-tier inference for synthetic data; no paid billing is enabled.
@@ -19,7 +19,9 @@ This is the current implementation handoff. Update it in every material implemen
 - GitHub remote was configured as `https://github.com/Kashshaf-Labib-Ontik/Kribu-Demo.git`.
 - Root README and the six living collaboration documents were prepared.
 - The architecture decision was aligned to LangGraph rather than PydanticAI for durable product growth.
-- Iteration 1 working tree now contains pinned web/API dependencies, Docker Compose, pgvector initialization, API health probes, a responsive Studio landing shell, and focused checks.
+- Iteration 1 was committed and pushed on `dev-v1.0.x`.
+- The Gemini decision and standalone web-container fix were committed and pushed.
+- Iteration 2 now has a typed `ModelProvider`, Gemini adapter, synthetic-only prompt contract, safe provider errors, structured output, streaming, function selection, usage/latency metadata, and a live verification command.
 
 ## Current decisions
 
@@ -44,9 +46,9 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Current file/area being worked on
 
-- `apps/web`: Next.js Studio foundation and API status display.
-- `services/api`: FastAPI application, configuration, correlation IDs, and health endpoints.
-- `compose.yaml` and `infra/compose/postgres`: local PostgreSQL/pgvector foundation.
+- `services/api/app/ai`: provider contracts, Gemini adapter, configuration checks, and errors.
+- `services/api/scripts/verify_gemini.py`: explicit synthetic-only live provider spike.
+- `services/api/tests/test_model_provider.py`: focused provider-boundary checks.
 
 ## Verification performed
 
@@ -57,7 +59,12 @@ This is the current implementation handoff. Update it in every material implemen
 - Three focused API health/correlation/readiness tests pass; the current FastAPI test client emits one upstream deprecation warning.
 - Host-level smoke test passes: liveness `200`, web `200` with API available, and readiness safely returns `503` while PostgreSQL is absent.
 - JavaScript and Python frozen lockfile checks pass; Docker Compose configuration validates.
-- Docker Desktop is now running; PostgreSQL and API are healthy. Web was restarting because its runtime image invoked pnpm as a non-writable user; the standalone-server Dockerfile fix is part of this uncommitted update.
+- Docker Desktop is running; PostgreSQL, API, and standalone Next.js web containers are healthy.
+- Official Google Gen AI SDK documentation confirms `gemini-3.8-flash` supports structured output, streaming, and function calling.
+- Local adapter checks cover synthetic-only enforcement, missing/placeholder and production rejection, typed output metadata, streaming completion, and non-executing tool selection.
+- Ruff and mypy pass; 11 focused API/provider tests pass with one upstream TestClient deprecation warning; Compose configuration validates.
+- The rebuilt API returns readiness `200`; all three Docker services are running.
+- Live Gemini verification passed with synthetic prompts for structured output, streaming, and non-executing tool selection on `gemini-3.8-flash`.
 
 ## Known open questions
 
@@ -68,7 +75,7 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Next step
 
-Complete the web container fix and present the Gemini decision/documentation update for owner review. Commit and push only after explicit approval; then begin the Gemini provider spike.
+Commit and push Iteration 2 to `dev-v1.0.x`, then begin Iteration 3: the identity and tenant boundary.
 
 ## Update template
 
