@@ -15,7 +15,8 @@ class Settings(BaseSettings):
     service_name: str = "kribu-api"
     environment: Literal["development", "test", "production"] = "development"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
-    database_url: str = "postgresql+asyncpg://kribu:kribu_dev_only@localhost:5432/kribu"
+    # Required, no default: a silent fallback to the bootstrap superuser would bypass RLS.
+    database_url: SecretStr
     cors_origins: list[AnyHttpUrl] = [AnyHttpUrl("http://localhost:3000")]
     oidc_issuer_url: str = "http://localhost:8180/realms/kribu-demo"
     oidc_jwks_url: str = "http://localhost:8180/realms/kribu-demo/protocol/openid-connect/certs"
@@ -36,4 +37,4 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    return Settings()  # type: ignore[call-arg]  # required fields come from the environment

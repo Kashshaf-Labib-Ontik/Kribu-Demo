@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from time import monotonic
 from typing import cast
@@ -26,6 +27,8 @@ from app.ai.errors import (
     ModelProviderUnavailableError,
 )
 from app.core.config import Settings
+
+logger = logging.getLogger(__name__)
 
 _RETRYABLE_STATUS_CODES = [408, 429, 500, 502, 503, 504]
 
@@ -95,10 +98,11 @@ class GeminiModelProvider:
                 output = response_model.model_validate_json(response.text)
             else:
                 raise ModelProviderResponseError
-        except (ValidationError, ModelProviderResponseError):
-            raise ModelProviderResponseError from None
+        except (ValidationError, ModelProviderResponseError) as error:
+            logger.warning("Gemini structured response was invalid: %s", type(error).__name__)
+            raise ModelProviderResponseError from error
         except Exception as error:
-            raise _map_provider_error(error) from None
+            raise _map_provider_error(error) from error
 
         return StructuredModelResult[StructuredOutputT](
             output=output,
@@ -127,7 +131,7 @@ class GeminiModelProvider:
                 if response.text:
                     yield ModelStreamEvent(event="text_delta", text=response.text)
         except Exception as error:
-            raise _map_provider_error(error) from None
+            raise _map_provider_error(error) from error
 
         if final_response is None:
             raise ModelProviderResponseError
@@ -183,7 +187,7 @@ class GeminiModelProvider:
         except ModelProviderResponseError:
             raise
         except Exception as error:
-            raise _map_provider_error(error) from None
+            raise _map_provider_error(error) from error
 
         return ToolSelectionResult(
             call=ToolCall(name=selected.name, arguments=arguments),
@@ -227,6 +231,8 @@ def _metadata(
 
 
 def _map_provider_error(error: Exception) -> ModelProviderUnavailableError:
+    # Exception class only; provider messages may echo prompt text.
+    logger.warning("Gemini call failed: %s", type(error).__name__)
     if isinstance(error, errors.APIError):
         status_code = error.code
         return ModelProviderUnavailableError(

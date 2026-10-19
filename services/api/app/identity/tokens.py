@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 import jwt
 from jwt import PyJWKClient
-from jwt.exceptions import InvalidTokenError, PyJWKClientError
+from jwt.exceptions import InvalidTokenError, PyJWKClientConnectionError, PyJWKClientError
 from pydantic import ValidationError
 
 from app.core.config import Settings
 from app.identity.contracts import AccessTokenClaims, CurrentUser
-from app.identity.errors import InvalidAccessTokenError
+from app.identity.errors import IdentityProviderUnavailableError, InvalidAccessTokenError
+
+logger = logging.getLogger(__name__)
 
 
 class OidcTokenVerifier:
@@ -41,7 +44,12 @@ class OidcTokenVerifier:
                 options={"require": ["aud", "exp", "iat", "iss", "sub"]},
             )
             claims = AccessTokenClaims.model_validate(raw_claims)
+        except PyJWKClientConnectionError as exc:
+            logger.warning("identity provider signing keys unavailable", exc_info=True)
+            raise IdentityProviderUnavailableError() from exc
         except (InvalidTokenError, PyJWKClientError, ValidationError, OSError, ValueError) as exc:
+            # Log the failure class only: messages can echo claim values.
+            logger.info("access token rejected: %s", type(exc).__name__)
             raise InvalidAccessTokenError() from exc
 
         roles = frozenset(role for role in claims.realm_access.roles if role.strip())

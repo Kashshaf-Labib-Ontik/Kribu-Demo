@@ -9,12 +9,14 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.audit.errors import AuditUnavailableError
 from app.identity.contracts import CurrentUser
 from app.identity.models import Tenant, UserProfile
 from app.main import app
+from app.policy.adapters import from_demo_descriptor
 from app.policy.client import OpaClient
 from app.policy.contracts import AuthorizationDecision, AuthorizationInput
-from app.policy.errors import AuditUnavailableError, PolicyUnavailableError, ResourceNotFoundError
+from app.policy.errors import PolicyUnavailableError, ResourceNotFoundError
 from app.policy.models import ResourceAclGrant, ResourceDescriptor
 from app.policy.service import read_demo_resource
 
@@ -208,3 +210,53 @@ def test_demo_resource_requires_bearer_token() -> None:
 
     assert response.status_code == 401
     assert response.json()["code"] == "authentication_required"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "response",
+    [
+        httpx.Response(200, json={"result": "guard-v0"}),
+        httpx.Response(200, json=["guard-v1"]),
+        httpx.Response(500, json={}),
+        httpx.Response(200, text="not json"),
+    ],
+    ids=["wrong-version", "not-an-object", "server-error", "not-json"],
+)
+async def test_opa_readiness_fails_closed(response: httpx.Response) -> None:
+    client = OpaClient("http://opa.test", 1, "guard-v1")
+    response.request = httpx.Request("GET", "http://opa.test/v1/data/kribu/authz/policy_version")
+    client._client.get = AsyncMock(return_value=response)  # type: ignore[method-assign]
+    try:
+        assert await client.ready() is False
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_opa_readiness_accepts_expected_version() -> None:
+    client = OpaClient("http://opa.test", 1, "guard-v1")
+    response = httpx.Response(
+        200,
+        json={"result": "guard-v1"},
+        request=httpx.Request("GET", "http://opa.test/v1/data/kribu/authz/policy_version"),
+    )
+    client._client.get = AsyncMock(return_value=response)  # type: ignore[method-assign]
+    try:
+        assert await client.ready() is True
+    finally:
+        await client.close()
+
+
+def test_unknown_classification_maps_to_unmapped() -> None:
+    descriptor = ResourceDescriptor(
+        id=SALARY_ID,
+        tenant_id=TENANT_ID,
+        resource_type="employee_record",
+        classification="top_secret",
+        department="human-resources",
+        owner_subject_id=None,
+        title="Synthetic",
+    )
+
+    assert from_demo_descriptor(descriptor, []).classification == "unmapped"

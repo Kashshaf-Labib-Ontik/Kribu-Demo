@@ -184,3 +184,17 @@ def test_policy_outage_returns_503_and_is_audited(
     assert [(row["allowed"], row["reason_code"], row["policy_version"]) for row in rows] == [
         (False, "policy_unavailable", None)
     ]
+
+
+def test_audit_rows_carry_the_server_request_id(
+    api_client: TestClient, token_for: Callable[..., str], owner_db: Any
+) -> None:
+    correlation_id = f"request-id-{uuid4()}"
+
+    response = read(api_client, ENGINEERING, bearer(token_for, "mike"), correlation_id)
+
+    rows = owner_db.fetch(
+        "SELECT request_id FROM authorization_audit_events WHERE correlation_id = $1",
+        correlation_id,
+    )
+    assert [row["request_id"] for row in rows] == [response.headers["X-Request-ID"]]

@@ -209,3 +209,9 @@ def owner_db() -> Any:
 def app_dsn(seeded_database: dict[str, dict[str, int]]) -> str:
     """asyncpg DSN for the restricted runtime role on kribu_test."""
     return APP_TEST_DSN
+
+
+@pytest.fixture
+def owner_sqlalchemy_url(seeded_database: dict[str, dict[str, int]]) -> str:
+    """SQLAlchemy URL for the schema owner (a superuser in Compose and CI)."""
+    return as_sqlalchemy(OWNER_TEST_DSN)

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
+
 import httpx
 from pydantic import ValidationError
 
 from app.policy.contracts import AuthorizationDecision, AuthorizationInput, OpaResponse
 from app.policy.errors import PolicyUnavailableError
+
+logger = logging.getLogger(__name__)
 
 
 class OpaClient:
@@ -24,6 +28,7 @@ class OpaClient:
             payload = response.json()
             return isinstance(payload, dict) and payload.get("result") == self._expected_version
         except (httpx.HTTPError, ValueError):
+            logger.warning("OPA readiness check failed", exc_info=True)
             return False
 
     async def evaluate(self, policy_input: AuthorizationInput) -> AuthorizationDecision:
@@ -36,7 +41,13 @@ class OpaClient:
             envelope = OpaResponse.model_validate(response.json())
             decision = envelope.result
             if decision.policy_version != self._expected_version:
+                logger.warning(
+                    "OPA policy version mismatch: expected %s, got %s",
+                    self._expected_version,
+                    decision.policy_version,
+                )
                 raise PolicyUnavailableError()
             return decision
         except (httpx.HTTPError, ValueError, ValidationError) as exc:
+            logger.warning("OPA evaluation failed", exc_info=True)
             raise PolicyUnavailableError() from exc

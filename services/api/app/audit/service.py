@@ -1,15 +1,19 @@
 from __future__ import annotations
 
+import logging
 from uuid import UUID, uuid4
 
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.audit.errors import AuditUnavailableError
 from app.audit.models import AuthorizationAuditEvent
+from app.core.request_context import current_request_id
 from app.identity.contracts import CurrentUser
-from app.identity.dependencies import set_tenant_context
+from app.identity.tenancy import tenant_transaction
 from app.policy.contracts import AuthorizationInput
-from app.policy.errors import AuditUnavailableError
+
+logger = logging.getLogger(__name__)
 
 
 async def record_authorization_event(
@@ -25,8 +29,7 @@ async def record_authorization_event(
 ) -> None:
     metadata = policy_input.model_dump(mode="json") if policy_input is not None else {}
     try:
-        async with session_factory() as session, session.begin():
-            await set_tenant_context(session, current_user)
+        async with tenant_transaction(session_factory, current_user) as session:
             session.add(
                 AuthorizationAuditEvent(
                     id=uuid4(),
@@ -38,8 +41,10 @@ async def record_authorization_event(
                     reason_code=reason_code,
                     policy_version=policy_version,
                     correlation_id=correlation_id,
+                    request_id=current_request_id(),
                     input_metadata=metadata,
                 )
             )
     except (OSError, SQLAlchemyError) as exc:
+        logger.warning("authorization audit write failed", exc_info=True)
         raise AuditUnavailableError() from exc
