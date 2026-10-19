@@ -17,6 +17,8 @@ from app.core.errors import AppError, problem_response
 from app.core.logging import configure_logging
 from app.core.request_context import RequestContextMiddleware
 from app.core.version import API_VERSION
+from app.documents.storage import LocalFileObjectStore
+from app.documents.upload_guard import UploadGuardMiddleware
 from app.identity.tokens import OidcTokenVerifier
 from app.policy.client import OpaClient
 
@@ -33,6 +35,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.database_engine = engine
     app.state.database_session_factory = create_session_factory(engine)
     app.state.token_verifier = OidcTokenVerifier(settings)
+    app.state.object_store = LocalFileObjectStore(settings.document_store_path)
     app.state.opa_client = OpaClient(
         str(settings.opa_url),
         settings.opa_timeout_seconds,
@@ -53,7 +56,8 @@ def create_app() -> FastAPI:
         redoc_url=None,
         lifespan=lifespan,
     )
-    # Added first, so CORS (added next) wraps it and 500 problems keep CORS headers.
+    # Innermost first: the upload guard sees request IDs; CORS wraps everything, 500s too.
+    application.add_middleware(UploadGuardMiddleware, max_file_bytes=settings.upload_max_bytes)
     application.add_middleware(RequestContextMiddleware)
     application.add_middleware(
         CORSMiddleware,

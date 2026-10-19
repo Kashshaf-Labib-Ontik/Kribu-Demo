@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.audit.errors import AuditUnavailableError
 from app.identity.contracts import CurrentUser
 from app.main import app
-from app.policy.adapters import from_demo_descriptor
+from app.policy.adapters import from_descriptor
 from app.policy.authorization import authorize, subject_attributes, unavailable_resource
 from app.policy.client import OpaClient
 from app.policy.contracts import (
@@ -240,4 +240,4 @@ def test_unknown_classification_maps_to_unmapped() -> None:
         title="Synthetic",
     )
 
-    assert from_demo_descriptor(descriptor, []).classification == "unmapped"
+    assert from_descriptor(descriptor, []).classification == "unmapped"

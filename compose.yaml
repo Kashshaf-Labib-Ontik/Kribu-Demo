@@ -143,7 +143,9 @@ services:
       KRIBU_OIDC_CLOCK_SKEW_SECONDS: ${KRIBU_OIDC_CLOCK_SKEW_SECONDS:-30}
       KRIBU_OPA_URL: http://opa:8181
       KRIBU_OPA_TIMEOUT_SECONDS: ${KRIBU_OPA_TIMEOUT_SECONDS:-2}
-      KRIBU_OPA_POLICY_VERSION: ${KRIBU_OPA_POLICY_VERSION:-guard-v1}
+      KRIBU_OPA_POLICY_VERSION: ${KRIBU_OPA_POLICY_VERSION:-guard-v2}
+      KRIBU_DOCUMENT_STORE_PATH: /var/lib/kribu/documents
+      KRIBU_UPLOAD_MAX_BYTES: ${KRIBU_UPLOAD_MAX_BYTES:-26214400}
       KRIBU_MODEL_PROVIDER: ${KRIBU_MODEL_PROVIDER:-gemini}
       KRIBU_MODEL_DATA_POLICY: ${KRIBU_MODEL_DATA_POLICY:-synthetic_only}
       KRIBU_GEMINI_API_KEY: ${KRIBU_GEMINI_API_KEY:-}
@@ -154,6 +156,8 @@ services:
       KRIBU_GEMINI_RETRY_ATTEMPTS: ${KRIBU_GEMINI_RETRY_ATTEMPTS:-3}
     ports:
       - "${API_PORT:-8000}:8000"
+    volumes:
+      - kribu_document_store:/var/lib/kribu/documents
     networks: [default, policy_internal]
     depends_on:
       seed:
@@ -203,6 +207,7 @@ services:
 volumes:
   kribu_postgres_data:
   kribu_keycloak_postgres_data:
+  kribu_document_store:
 
 networks:
   policy_internal:

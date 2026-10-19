@@ -108,8 +108,9 @@ async def verify_audit(
         for tenant_id, ids in correlation_ids.items():
             async with connection.transaction():
                 await connection.execute("SELECT set_config('app.tenant_id', $1, true)", tenant_id)
+                # Seeded Guard records only; uploaded documents are verified separately.
                 resource_count = await connection.fetchval(
-                    "SELECT count(*) FROM resource_descriptors"
+                    "SELECT count(*) FROM resource_descriptors WHERE resource_type <> 'document'"
                 )
                 audit_count = await connection.fetchval(
                     "SELECT count(*) FROM authorization_audit_events "
@@ -142,6 +143,48 @@ async def verify_audit(
         }
     finally:
         await connection.close()
+
+
+async def verify_documents(
+    client: httpx.AsyncClient, api_url: str, tokens: dict[str, str]
+) -> dict[str, object]:
+    """Helen uploads a synthetic restricted HR PDF; only HR managers can then read it."""
+    content = f"%PDF-1.4\n% SYNTHETIC ONLY: Guard verification {uuid4()}\n%%EOF\n".encode()
+    metadata = {
+        "title": "Synthetic salary revision letter (verification)",
+        "classification": "restricted_hr",
+        "department": "human-resources",
+        "domain": "hr",
+        "grants": [{"principal_type": "role", "principal_id": "hr_manager"}],
+    }
+    upload = {
+        "data": {"metadata": json.dumps(metadata)},
+        "files": {"file": ("synthetic-salary.pdf", content, "application/pdf")},
+    }
+    anonymous = await client.post(f"{api_url}/documents/uploads", **upload)
+    if anonymous.status_code != 401:
+        raise RuntimeError("Anonymous upload was not rejected.")
+    created = await client.post(
+        f"{api_url}/documents/uploads",
+        headers={
+            "Authorization": f"Bearer {tokens['helen.hr']}",
+            "Idempotency-Key": f"verify-{uuid4()}",
+        },
+        **upload,
+    )
+    if created.status_code != 201:
+        raise RuntimeError(f"Document upload failed: {created.status_code}")
+    document_id = created.json()["document_id"]
+    statuses = {}
+    for username in ("helen.hr", "mike"):
+        response = await client.get(
+            f"{api_url}/documents/{document_id}",
+            headers={"Authorization": f"Bearer {tokens[username]}"},
+        )
+        statuses[username] = response.status_code
+    if statuses != {"helen.hr": 200, "mike": 404}:
+        raise RuntimeError(f"Unexpected document read statuses: {statuses}")
+    return {"document_id": document_id, "upload_status": 201, "read_statuses": statuses}
 
 
 async def run(args: argparse.Namespace) -> None:
@@ -193,8 +236,20 @@ async def run(args: argparse.Namespace) -> None:
         if spoofed.status_code != 404:
             raise RuntimeError("Caller-controlled attributes changed the Guard decision.")
 
+        documents = await verify_documents(client, args.api_url, tokens)
+
     audit = await verify_audit(args.database_url, correlation_ids)
-    print(json.dumps({"checks": outcomes, "spoofed_mike_status": 404, "audit": audit}, indent=2))
+    print(
+        json.dumps(
+            {
+                "checks": outcomes,
+                "spoofed_mike_status": 404,
+                "documents": documents,
+                "audit": audit,
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

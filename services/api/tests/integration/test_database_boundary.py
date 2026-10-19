@@ -14,7 +14,7 @@ pytestmark = pytest.mark.integration
 DEMO_TENANT = "11111111-1111-4111-8111-111111111111"
 OTHER_TENANT = "22222222-2222-4222-8222-222222222222"
 MIKE = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1"
-ENGINEERING = "10000000-0000-4000-8000-000000000002"
+OTHER_RESOURCE = "10000000-0000-4000-8000-000000000004"
 TENANT_TABLES = (
     "tenants",
     "user_profiles",
@@ -116,7 +116,10 @@ async def test_runtime_role_cannot_modify_authorization_data(
 
 
 @pytest.mark.asyncio
-async def test_runtime_role_cannot_grant_itself_access(app_connection: asyncpg.Connection) -> None:
+async def test_runtime_role_cannot_create_grants_in_another_tenant(
+    app_connection: asyncpg.Connection,
+) -> None:
+    """Uploads may insert ACL grants (0003), but only inside the caller's tenant context."""
     transaction = app_connection.transaction()
     await transaction.start()
     try:
@@ -127,9 +130,66 @@ async def test_runtime_role_cannot_grant_itself_access(app_connection: asyncpg.C
                 "(id, tenant_id, resource_id, principal_type, principal_id, action) "
                 "VALUES ($1, $2, $3, 'subject', $4, 'resource.read')",
                 uuid4(),
-                DEMO_TENANT,
-                ENGINEERING,
+                OTHER_TENANT,
+                OTHER_RESOURCE,
                 MIKE,
             )
+    finally:
+        await transaction.rollback()
+
+
+SALARY_RESOURCE = "10000000-0000-4000-8000-000000000001"
+HELEN = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2"
+INSERT_DESCRIPTOR = (
+    "INSERT INTO resource_descriptors "
+    "(id, tenant_id, resource_type, classification, department, owner_subject_id, title) "
+    "VALUES ($1, $2, 'document', 'internal', 'engineering', $3, 'Synthetic')"
+)
+INSERT_GRANT = (
+    "INSERT INTO resource_acl_grants "
+    "(id, tenant_id, resource_id, principal_type, principal_id, action) "
+    "VALUES ($1, $2, $3, 'subject', $4, 'resource.read')"
+)
+
+
+@pytest.mark.asyncio
+async def test_runtime_role_cannot_forge_a_resource_owner(
+    app_connection: asyncpg.Connection,
+) -> None:
+    transaction = app_connection.transaction()
+    await transaction.start()
+    try:
+        await in_tenant(app_connection, DEMO_TENANT)
+        with pytest.raises(asyncpg.InsufficientPrivilegeError):
+            await app_connection.execute(INSERT_DESCRIPTOR, uuid4(), DEMO_TENANT, HELEN)
+    finally:
+        await transaction.rollback()
+
+
+@pytest.mark.asyncio
+async def test_runtime_role_cannot_grant_itself_access_to_another_owners_resource(
+    app_connection: asyncpg.Connection,
+) -> None:
+    transaction = app_connection.transaction()
+    await transaction.start()
+    try:
+        await in_tenant(app_connection, DEMO_TENANT)
+        with pytest.raises(asyncpg.InsufficientPrivilegeError):
+            await app_connection.execute(INSERT_GRANT, uuid4(), DEMO_TENANT, SALARY_RESOURCE, MIKE)
+    finally:
+        await transaction.rollback()
+
+
+@pytest.mark.asyncio
+async def test_runtime_role_may_create_its_own_resource_and_grants(
+    app_connection: asyncpg.Connection,
+) -> None:
+    resource_id = uuid4()
+    transaction = app_connection.transaction()
+    await transaction.start()
+    try:
+        await in_tenant(app_connection, DEMO_TENANT)
+        await app_connection.execute(INSERT_DESCRIPTOR, resource_id, DEMO_TENANT, MIKE)
+        await app_connection.execute(INSERT_GRANT, uuid4(), DEMO_TENANT, resource_id, HELEN)
     finally:
         await transaction.rollback()

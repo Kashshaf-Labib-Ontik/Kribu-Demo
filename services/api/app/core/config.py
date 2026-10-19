@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import AnyHttpUrl, Field, SecretStr
@@ -24,7 +25,9 @@ class Settings(BaseSettings):
     oidc_clock_skew_seconds: int = Field(default=30, ge=0, le=120)
     opa_url: AnyHttpUrl = AnyHttpUrl("http://localhost:8181")
     opa_timeout_seconds: float = Field(default=2, gt=0, le=10)
-    opa_policy_version: str = Field(default="guard-v1", min_length=1)
+    opa_policy_version: str = Field(default="guard-v2", min_length=1)
+    document_store_path: Path = Path("storage/documents")
+    upload_max_bytes: int = Field(default=26_214_400, ge=1, le=268_435_456)
     model_provider: Literal["gemini"] = "gemini"
     model_data_policy: Literal["synthetic_only"] = "synthetic_only"
     gemini_api_key: SecretStr | None = None

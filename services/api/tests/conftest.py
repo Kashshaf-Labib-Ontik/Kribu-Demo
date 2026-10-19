@@ -8,6 +8,7 @@ must never leak into tests, so both are removed here, at module level.
 from __future__ import annotations
 
 import os
+import tempfile
 from collections.abc import Iterator
 
 import pytest
@@ -28,6 +29,7 @@ os.environ.update(
             "postgresql+asyncpg://kribu_app:kribu_app_dev_only@localhost:5432/kribu_test"
         ),
         "KRIBU_OPA_URL": "http://localhost:8181",
+        "KRIBU_DOCUMENT_STORE_PATH": tempfile.mkdtemp(prefix="kribu-test-store-"),
     }
 )
 Settings.model_config["env_file"] = None

@@ -5,6 +5,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.api.routes.health import get_database_engine
+from app.documents.dependencies import get_object_store
+from app.documents.errors import DocumentStoreUnavailableError
+from app.documents.storage import ObjectStore
 from app.main import app
 from app.policy.client import OpaClient
 from app.policy.dependencies import get_opa_client
@@ -78,3 +81,26 @@ def test_readiness_returns_problem_when_policy_engine_is_not_ready() -> None:
     assert response.status_code == 503
     assert response.json()["code"] == "authorization_unavailable"
     assert response.json()["correlation_id"] == "opa-down"
+
+
+def test_readiness_returns_problem_when_document_store_is_unwritable() -> None:
+    working_engine = Mock(spec=AsyncEngine)
+    connection = AsyncMock()
+    working_engine.connect.return_value.__aenter__ = AsyncMock(return_value=connection)
+    working_engine.connect.return_value.__aexit__ = AsyncMock(return_value=None)
+    opa_client = Mock(spec=OpaClient)
+    opa_client.ready = AsyncMock(return_value=True)
+    store = Mock(spec=ObjectStore)
+    store.probe.side_effect = DocumentStoreUnavailableError()
+    app.dependency_overrides[get_database_engine] = lambda: cast(AsyncEngine, working_engine)
+    app.dependency_overrides[get_opa_client] = lambda: opa_client
+    app.dependency_overrides[get_object_store] = lambda: store
+
+    try:
+        with TestClient(app) as client:
+            response = client.get("/v1/health/ready", headers={"X-Correlation-ID": "store-down"})
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "document_store_unavailable"

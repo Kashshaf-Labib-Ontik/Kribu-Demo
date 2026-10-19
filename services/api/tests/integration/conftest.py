@@ -156,21 +156,38 @@ def build_verifier() -> OidcTokenVerifier:
 
 
 @pytest.fixture
+def document_store(tmp_path: Path) -> Path:
+    return tmp_path / "documents"
+
+
+@pytest.fixture
 def api_client_factory(
-    seeded_database: dict[str, dict[str, int]], monkeypatch: pytest.MonkeyPatch
+    seeded_database: dict[str, dict[str, int]],
+    monkeypatch: pytest.MonkeyPatch,
+    document_store: Path,
 ) -> Iterator[Callable[..., TestClient]]:
-    """Build a TestClient wired to kribu_test as kribu_app, with an optional OPA override."""
+    """Build a TestClient wired to kribu_test as kribu_app, with optional overrides."""
     clients: list[TestClient] = []
 
-    def factory(*, opa_url: str = OPA_URL) -> TestClient:
+    def factory(
+        *,
+        opa_url: str = OPA_URL,
+        store_path: Path | None = None,
+        upload_max_bytes: int | None = None,
+    ) -> TestClient:
         monkeypatch.setenv("KRIBU_DATABASE_URL", as_sqlalchemy(APP_TEST_DSN))
         monkeypatch.setenv("KRIBU_OPA_URL", opa_url)
+        monkeypatch.setenv("KRIBU_DOCUMENT_STORE_PATH", str(store_path or document_store))
+        if upload_max_bytes is not None:
+            monkeypatch.setenv("KRIBU_UPLOAD_MAX_BYTES", str(upload_max_bytes))
         get_settings.cache_clear()
         application = create_app()
         verifier = build_verifier()
         application.dependency_overrides[get_token_verifier] = lambda: verifier
         client = TestClient(application)
         client.__enter__()
+        # The upload guard authenticates before routing, from app.state.
+        application.state.token_verifier = verifier
         clients.append(client)
         return client
 

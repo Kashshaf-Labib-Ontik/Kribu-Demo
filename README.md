@@ -108,4 +108,4 @@ Overrides: `KRIBU_TEST_OWNER_DATABASE_URL` (default `postgresql://kribu:kribu_de
 
 ## Current status
 
-Iterations 0-3 are committed and pushed on `dev-v1.0.x`. Iteration 4 is implemented and live-verified in the working tree, pending owner review. It adds OPA-backed RBAC/ABAC, resource ACL metadata, a protected synthetic read path, and append-only runtime audit records. Document ingestion and natural-language query enforcement are later iterations.
+Iterations 0-4 and the pre-Iteration 5 hardening (test harness and CI, unified API errors and logging, the reusable Guard `authorize()` step) are committed on `dev-v1.0.x`. Iteration 5 document upload and versioning is implemented and verified in the working tree, pending owner review: `POST /v1/documents/uploads`, `POST /v1/documents/{id}/versions`, and `GET /v1/documents/{id}`. Parsing, retrieval and natural-language query enforcement are later iterations.

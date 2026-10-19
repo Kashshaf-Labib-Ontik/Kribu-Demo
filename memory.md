@@ -4,7 +4,7 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Current status
 
-- **Lifecycle:** Iterations 0-4 are committed (Iteration 4 as `c38d543`). Pre-Iteration 5 hardening (engineering review D1-D22) is in progress: Groups 1-2 are committed (`3ced2fb`, `a260fe2`); Group 3 "Extract Guard authorization step" is in the working tree, pending owner review.
+- **Lifecycle:** Iterations 0-4 are committed (Iteration 4 as `c38d543`). Pre-Iteration 5 hardening (engineering review D1-D22) is in progress: Groups 1-3 are committed (`3ced2fb`, `a260fe2`, `387bc81`). Iteration 5 "Add document upload lifecycle" is implemented and verified in the working tree, pending owner review.
 - **Active area:** Hardening Groups 1-3 (safety net, error/logging boundaries, Guard `authorize()` refactor), then Iteration 5 document upload per the reviewed plan.
 - **Application code:** Keycloak identity, RLS, OPA RBAC/ABAC, protected synthetic resource access, and append-only authorization audit are committed.
 - **Selected stories:** NGO Project, HR Employee History, Client Complaint Patterns.
@@ -26,7 +26,8 @@ This is the current implementation handoff. Update it in every material implemen
 - Iteration 4 was committed as `c38d543` with pinned OPA `1.21.2`, `guard-v1` Rego policy, canonical subject/resource/action inputs, ACL metadata, synthetic proof content, and tenant-scoped append-only runtime audit.
 - Hardening Group 1 (`3ced2fb`): hermetic test settings; schema-only migrations plus idempotent `scripts/seed_demo.py` and a Compose `seed` service; runtime role read-only on identity and authorization tables (insert-only on audit); audit `request_id` column; integration suite (`pnpm test:integration`, real PostgreSQL + OPA); `pnpm test:policy`; GitHub Actions CI.
 - Hardening Group 2 (`a260fe2`): `AppError` + RFC 9457 `application/problem+json` for every error (422 never echoes input); pure ASGI request context (validated `X-Correlation-ID`, server `X-Request-ID`, logged 500 problem, CORS wraps it); correlated stdlib logging; required `database_url` (`SecretStr`) and a startup guard refusing superuser/BYPASSRLS/table-owner roles; JWKS outage returns 503 `identity_provider_unavailable`; one `tenant_transaction()`; audit rows carry `request_id`; fixed CORS origins (pydantic's trailing `/` never matched a browser `Origin`).
-- Hardening Group 3 (uncommitted): reusable `app/policy/authorization.py` `authorize()` (one OPA decision, one audit row with the caller's action, fails closed; missing resources deny as `resource_unavailable`); the protected read uses three short tenant transactions and holds no connection during the OPA call; inactive or unprovisioned identities are audited (`identity_not_provisioned`) before the 403. Rego still allows only `resource.read`; Iteration 5 adds document actions with `guard-v2`.
+- Hardening Group 3 (`387bc81`): reusable `app/policy/authorization.py` `authorize()` (one OPA decision, one audit row with the caller's action, fails closed; missing resources deny as `resource_unavailable`); the protected read uses three short tenant transactions and holds no connection during the OPA call; inactive or unprovisioned identities are audited (`identity_not_provisioned`) before the 403. Rego `guard-v1` allowed only `resource.read`.
+- Iteration 5 (uncommitted): `app/documents/` (models, contracts, errors, stdlib type validation, `LocalFileObjectStore`, ASGI `UploadGuardMiddleware`, service), routes `POST /v1/documents/uploads`, `POST /v1/documents/{id}/versions`, `GET /v1/documents/{id}`, migration `0003_documents`, Rego `guard-v2` upload rules, Compose `kribu_document_store` volume, readiness store probe, `python-multipart`, and a document case in `scripts/verify_guard.py`. Post-implementation security review (owner decisions 2026-10-19): adding a version requires read access as well as the upload rule; own-document duplicates must also match classification, department and grant set; restrictive RLS binds new descriptors/grants to the acting subject; upload replays are private to their sender; the version counter can only advance by one; corrupt OOXML, XLM macro sheets and control characters are rejected.
 
 ## Current decisions
 
@@ -88,7 +89,7 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Next step
 
-Owner reviews hardening Group 3 and approves its commit (`Extract Guard authorization step`). Then Iteration 5 (`Add document upload lifecycle`). Local databases created before Group 1 need one `docker compose down -v`. On this machine a native PostgreSQL holds host port 5432, so local integration runs point `KRIBU_TEST_OWNER_DATABASE_URL` at the Compose port.
+Owner reviews Iteration 5 and approves its commit (`Add document upload lifecycle`). Then Iteration 6 (Docling/openpyxl parsing, provenance, quarantine, preview). Local stacks need a rebuild for `guard-v2` (OPA loads policies at start) and migration `0003`. Local databases created before Group 1 need one `docker compose down -v`. On this machine a native PostgreSQL holds host port 5432, so local integration runs point `KRIBU_TEST_OWNER_DATABASE_URL` at the Compose port.
 
 ## Update template
 

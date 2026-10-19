@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import and_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.identity.contracts import CurrentUser
 from app.identity.errors import IdentityNotProvisionedError
 from app.identity.service import get_identity_profile
 from app.identity.tenancy import tenant_transaction
-from app.policy.adapters import from_demo_descriptor
+from app.policy.adapters import from_descriptor
 from app.policy.authorization import (
     RESOURCE_READ,
     audit_unprovisioned_identity,
@@ -20,7 +20,8 @@ from app.policy.authorization import (
 from app.policy.client import OpaClient
 from app.policy.contracts import DemoResourceResponse
 from app.policy.errors import ResourceNotFoundError
-from app.policy.models import DemoResourceContent, ResourceAclGrant, ResourceDescriptor
+from app.policy.models import DemoResourceContent
+from app.policy.resources import load_resource
 
 DEMO_READ_PURPOSE = "demo_resource_read"
 
@@ -36,22 +37,9 @@ async def read_demo_resource(
     try:
         async with tenant_transaction(session_factory, current_user) as session:
             profile = await get_identity_profile(session, current_user)
-            rows = (
-                await session.execute(
-                    select(ResourceDescriptor, ResourceAclGrant)
-                    .outerjoin(
-                        ResourceAclGrant,
-                        and_(
-                            ResourceAclGrant.resource_id == ResourceDescriptor.id,
-                            ResourceAclGrant.tenant_id == ResourceDescriptor.tenant_id,
-                        ),
-                    )
-                    .where(
-                        ResourceDescriptor.id == resource_id,
-                        ResourceDescriptor.tenant_id == current_user.tenant_id,
-                    )
-                )
-            ).all()
+            descriptor, grants = await load_resource(
+                session, tenant_id=current_user.tenant_id, resource_id=resource_id
+            )
     except IdentityNotProvisionedError:
         await audit_unprovisioned_identity(
             session_factory=session_factory,
@@ -62,10 +50,8 @@ async def read_demo_resource(
         )
         raise
 
-    descriptor = rows[0][0] if rows else None
-    grants = [grant for _, grant in rows if grant is not None]
     resource = (
-        from_demo_descriptor(descriptor, grants)
+        from_descriptor(descriptor, grants)
         if descriptor is not None
         else unavailable_resource(resource_id, current_user.tenant_id)
     )
