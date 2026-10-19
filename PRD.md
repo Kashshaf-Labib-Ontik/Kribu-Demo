@@ -147,13 +147,14 @@ The demo is accepted when:
 
 - English-first; data structures remain Unicode and Bangla-ready.
 - One demo tenant is sufficient, but tenant isolation is implemented from the first schema.
-- Local model quality and latency depend on available RAM, CPU, and GPU; a benchmark spike selects the default model.
+- Reference development hardware has 16 GB total system RAM and integrated Intel UHD graphics using shared memory. Treat local inference as CPU-focused until benchmarking proves otherwise.
+- Local model quality and latency depend on the exact CPU and available shared memory; a benchmark spike selects the default model.
 - Synthetic data must be designed together with expected answers before prompt tuning.
 - Client schemas and connectors are placeholders until discovery after demo approval.
 
 ## 10. Open decisions before scaffolding
 
-- Reference development-machine CPU, RAM, GPU, and operating system.
+- Exact development-machine CPU model and operating-system version.
 - Whether the demo must run fully offline after initial dependency/model download.
 - Which user will demonstrate each role and approval path.
 - Maximum acceptable local-model response time during the live presentation.

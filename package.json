@@ -1,0 +1,22 @@
+{
+  "name": "kribu-demo",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@12.4.2",
+  "engines": {
+    "node": ">=24 <27",
+    "pnpm": ">=12 <13"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter @kribu/web dev",
+    "build:web": "pnpm --filter @kribu/web build",
+    "lint:web": "pnpm --filter @kribu/web lint",
+    "typecheck:web": "pnpm --filter @kribu/web typecheck",
+    "test:api": "uv run --package kribu-api pytest",
+    "lint:api": "uv run --package kribu-api ruff check services/api",
+    "format:api": "uv run --package kribu-api ruff format services/api",
+    "typecheck:api": "uv run --package kribu-api mypy services/api/app",
+    "check": "pnpm lint:web && pnpm typecheck:web && pnpm test:api && pnpm lint:api && pnpm typecheck:api"
+  }
+}
+

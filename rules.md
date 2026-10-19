@@ -105,7 +105,8 @@ Avoid snapshots of large prompts, exhaustive presentation-component tests, dupli
 ## 10. Git and iteration
 
 - Keep iterations vertically demonstrable and small enough to review in one sitting.
-- Commit after each accepted iteration with a concise imperative message describing the change.
+- Never commit or push an iteration until the owner has reviewed the working-tree changes and explicitly approved the commit.
+- After approval, commit the accepted iteration with a concise imperative message describing the change.
 - Do not mention Codex, AI agents, co-authorship, or collaboration tooling in commit messages.
 - Do not commit secrets, real client data, local model weights, generated caches, database volumes, or large transient artifacts.
 - Update `memory.md` in every material implementation commit with current state, decisions, active file/area, verification, and next step.

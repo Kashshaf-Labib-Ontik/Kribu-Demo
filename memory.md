@@ -4,12 +4,13 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Current status
 
-- **Lifecycle:** Planning / pre-scaffold.
-- **Active area:** Repository initialization and implementation plan.
-- **Application code:** Not started.
+- **Lifecycle:** Iteration 1 implementation, awaiting owner review.
+- **Active area:** Local monorepo scaffold and health flow.
+- **Application code:** Next.js Studio shell and FastAPI foundation implemented in the working tree; not committed.
 - **Selected stories:** NGO Project, HR Employee History, Client Complaint Patterns.
 - **Data:** Synthetic demo packs must be created; no client data sources are available.
 - **Cost constraint:** Demo uses only locally runnable free/open-source components and requires no card.
+- **Reference hardware:** 16 GB total system RAM with integrated Intel UHD graphics using shared memory; use a CPU-first model benchmark.
 
 ## Completed
 
@@ -18,6 +19,7 @@ This is the current implementation handoff. Update it in every material implemen
 - GitHub remote was configured as `https://github.com/Kashshaf-Labib-Ontik/Kribu-Demo.git`.
 - Root README and the six living collaboration documents were prepared.
 - The architecture decision was aligned to LangGraph rather than PydanticAI for durable product growth.
+- Iteration 1 working tree now contains pinned web/API dependencies, Docker Compose, pgvector initialization, API health probes, a responsive Studio landing shell, and focused checks.
 
 ## Current decisions
 
@@ -31,6 +33,7 @@ This is the current implementation handoff. Update it in every material implemen
 - Local filesystem is the demo object store behind an adapter; hosted object storage is deferred.
 - All proposed external actions remain drafts behind human approval during the demo.
 - Testing stays focused on security, retrieval, citations, graph behavior, API integration, goldens, and four browser journeys.
+- No implementation commit or push occurs until the owner reviews the working-tree changes and explicitly approves it.
 
 ## Superseded source decisions
 
@@ -40,25 +43,31 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Current file/area being worked on
 
-- Planning documents at repository root.
-- No source file is under implementation yet.
+- `apps/web`: Next.js Studio foundation and API status display.
+- `services/api`: FastAPI application, configuration, correlation IDs, and health endpoints.
+- `compose.yaml` and `infra/compose/postgres`: local PostgreSQL/pgvector foundation.
 
 ## Verification performed
 
 - Confirmed the selected stories against `Docs/KRIBU_Five_Demo_Stories.md`.
 - Confirmed the component/dataflow and LangGraph direction against `Docs/Diagram_PLAN.md` and the architecture pack.
 - Confirmed the repository had no previous Git metadata before initialization.
+- Web production build, TypeScript, ESLint, API Ruff, and API mypy checks pass.
+- Three focused API health/correlation/readiness tests pass; the current FastAPI test client emits one upstream deprecation warning.
+- Host-level smoke test passes: liveness `200`, web `200` with API available, and readiness safely returns `503` while PostgreSQL is absent.
+- JavaScript and Python frozen lockfile checks pass; Docker Compose configuration validates.
+- Docker Compose runtime is not yet verified because Docker Desktop is not running.
 
 ## Known open questions
 
-- Development machine CPU, RAM, and GPU/VRAM.
+- Exact development machine CPU model and operating-system version.
 - Whether the live demo must work fully offline after initial setup.
 - Target live-response latency.
 - Demo users and exact approval roles.
 
 ## Next step
 
-Owner reviews `PRD.md`, `Architecture.md`, `rules.md`, `phases.md`, and `design.md`. After approval, start Iteration 1: scaffold the local monorepo and core Docker Compose profile. Do not start the scaffold before that review.
+Complete Iteration 1 validation and present the uncommitted diff for owner review. Commit and push only after explicit approval; then begin the local inference benchmark iteration.
 
 ## Update template
 

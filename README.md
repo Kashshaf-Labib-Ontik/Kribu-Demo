@@ -22,6 +22,46 @@ The demo must run locally with free and open-source software. Client data connec
 - [Working memory](memory.md)
 - [Source documentation](Docs/)
 
+## Local development
+
+Prerequisites:
+
+- Node.js 24-26 and pnpm 12
+- Python 3.11 and uv
+- Docker Desktop with Docker Compose
+
+Install the locked dependencies:
+
+```powershell
+Copy-Item .env.example .env
+pnpm install --frozen-lockfile
+uv sync --package kribu-api
+```
+
+Start the complete local foundation:
+
+```powershell
+docker compose up --build
+```
+
+The Studio runs at `http://localhost:3000`, the API at `http://localhost:8000`, and API documentation at `http://localhost:8000/docs` in development.
+
+For faster application development, run PostgreSQL in Docker and the applications on the host:
+
+```powershell
+docker compose up -d postgres
+uv run --package kribu-api uvicorn app.main:app --app-dir services/api --reload
+pnpm dev:web
+```
+
+Run the focused scaffold checks:
+
+```powershell
+pnpm check
+pnpm build:web
+docker compose config --quiet
+```
+
 ## Current status
 
-The planning baseline and repository are initialized. Product code has not been scaffolded yet; implementation begins only after the planning documents are reviewed.
+Iteration 1 is under review. The uncommitted scaffold currently provides the Next.js Studio shell, FastAPI health endpoints, PostgreSQL/pgvector Compose service, locked dependencies, and focused checks.
