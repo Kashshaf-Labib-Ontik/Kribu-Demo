@@ -198,3 +198,66 @@ def test_audit_rows_carry_the_server_request_id(
         correlation_id,
     )
     assert [row["request_id"] for row in rows] == [response.headers["X-Request-ID"]]
+
+
+def test_inactive_identity_is_denied_and_audited(
+    api_client: TestClient, token_for: Callable[..., str], owner_db: Any
+) -> None:
+    subject = "cccccccc-cccc-4ccc-8ccc-ccccccccccc1"
+    owner_db.execute(
+        "INSERT INTO user_profiles "
+        "(id, tenant_id, external_subject, username, display_name, department, is_active) "
+        "VALUES ($1::uuid, $2::uuid, $1::text, 'former.employee', 'Former Employee', "
+        "'engineering', false)",
+        subject,
+        DEMO_TENANT,
+    )
+    correlation_id = f"inactive-{uuid4()}"
+    try:
+        token = token_for(
+            subject=subject,
+            username="former.employee",
+            tenant_id=DEMO_TENANT,
+            roles=["employee"],
+            department="engineering",
+        )
+        response = read(
+            api_client, ENGINEERING, {"Authorization": f"Bearer {token}"}, correlation_id
+        )
+        rows = owner_db.fetch(
+            "SELECT allowed, action, reason_code, policy_version, resource_id::text AS resource_id "
+            "FROM authorization_audit_events WHERE correlation_id = $1",
+            correlation_id,
+        )
+    finally:
+        owner_db.execute("DELETE FROM user_profiles WHERE id = $1::uuid", subject)
+
+    assert response.status_code == 403
+    assert response.json()["code"] == "identity_not_provisioned"
+    assert "SYNTHETIC" not in response.text
+    assert [dict(row) for row in rows] == [
+        {
+            "allowed": False,
+            "action": "resource.read",
+            "reason_code": "identity_not_provisioned",
+            "policy_version": None,
+            "resource_id": ENGINEERING,
+        }
+    ]
+
+
+def test_missing_resource_is_audited_as_unavailable(
+    api_client: TestClient, token_for: Callable[..., str], owner_db: Any
+) -> None:
+    correlation_id = f"missing-{uuid4()}"
+
+    response = read(api_client, str(uuid4()), bearer(token_for, "helen.hr"), correlation_id)
+
+    assert response.status_code == 404
+    rows = owner_db.fetch(
+        "SELECT allowed, reason_code FROM authorization_audit_events WHERE correlation_id = $1",
+        correlation_id,
+    )
+    assert [(row["allowed"], row["reason_code"]) for row in rows] == [
+        (False, "resource_unavailable")
+    ]

@@ -11,157 +11,138 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.audit.errors import AuditUnavailableError
 from app.identity.contracts import CurrentUser
-from app.identity.models import Tenant, UserProfile
 from app.main import app
 from app.policy.adapters import from_demo_descriptor
+from app.policy.authorization import authorize, subject_attributes, unavailable_resource
 from app.policy.client import OpaClient
-from app.policy.contracts import AuthorizationDecision, AuthorizationInput
-from app.policy.errors import PolicyUnavailableError, ResourceNotFoundError
-from app.policy.models import ResourceAclGrant, ResourceDescriptor
-from app.policy.service import read_demo_resource
+from app.policy.contracts import (
+    AccessGrant,
+    AuthorizationDecision,
+    AuthorizationInput,
+    ResourceAttributes,
+)
+from app.policy.errors import PolicyUnavailableError
+from app.policy.models import ResourceDescriptor
 
 TENANT_ID = UUID("11111111-1111-4111-8111-111111111111")
 SUBJECT_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1"
 SALARY_ID = UUID("10000000-0000-4000-8000-000000000001")
 
 
-def setup_read(
-    *, allowed: bool
-) -> tuple[AsyncSession, async_sessionmaker[AsyncSession], CurrentUser, OpaClient, AsyncMock]:
-    user = CurrentUser(
-        subject_id=SUBJECT_ID,
-        tenant_id=TENANT_ID,
-        username="mike",
-        roles=frozenset({"employee"}),
-        department="untrusted-token-department",
-    )
-    tenant = Tenant(id=TENANT_ID, slug="kribu-demo", name="KRIBU Demo Software")
-    profile = UserProfile(
-        id=UUID(SUBJECT_ID),
-        tenant_id=TENANT_ID,
-        external_subject=SUBJECT_ID,
-        username="mike",
-        display_name="Mike",
-        department="engineering",
-        is_active=True,
-    )
-    descriptor = ResourceDescriptor(
-        id=SALARY_ID,
-        tenant_id=TENANT_ID,
-        resource_type="employee_record",
-        classification="restricted_hr",
-        department="human-resources",
-        owner_subject_id="roger-synthetic",
-        title="Synthetic salary record",
-    )
-    grant = ResourceAclGrant(
-        id=UUID("20000000-0000-4000-8000-000000000001"),
-        tenant_id=TENANT_ID,
-        resource_id=SALARY_ID,
-        principal_type="role",
-        principal_id="hr_manager",
-        action="resource.read",
-    )
-    row = Mock()
-    row.one_or_none.return_value = (profile, tenant)
-    grants_result = Mock()
-    grants_result.all.return_value = [grant]
-    session = AsyncMock(spec=AsyncSession)
-    session.execute.return_value = row
-    session.scalar.side_effect = [descriptor, "SYNTHETIC ONLY: private content"]
-    session.scalars.return_value = grants_result
+USER = CurrentUser(
+    subject_id=SUBJECT_ID,
+    tenant_id=TENANT_ID,
+    username="mike",
+    roles=frozenset({"employee"}),
+    department="untrusted-token-department",
+)
+RESOURCE = ResourceAttributes(
+    id=SALARY_ID,
+    tenant_id=TENANT_ID,
+    resource_type="employee_record",
+    classification="restricted_hr",
+    department="human-resources",
+    owner_subject_id="roger-synthetic",
+    grants=[AccessGrant(principal_type="role", principal_id="hr_manager", action="resource.read")],
+)
+
+
+def opa_returning(*, allow: bool) -> OpaClient:
     opa = Mock(spec=OpaClient)
     opa.evaluate = AsyncMock(
         return_value=AuthorizationDecision(
-            allow=allowed,
-            reason_code="allowed" if allowed else "access_denied",
+            allow=allow,
+            reason_code="allowed" if allow else "access_denied",
             policy_version="guard-v1",
         )
     )
-    audit = AsyncMock()
-    return (
-        session,
-        cast(async_sessionmaker[AsyncSession], Mock()),
-        user,
-        cast(OpaClient, opa),
-        audit,
-    )
+    return cast(OpaClient, opa)
+
+
+async def run_authorize(opa: OpaClient, **overrides: object) -> AuthorizationDecision:
+    arguments: dict[str, object] = {
+        "session_factory": cast(async_sessionmaker[AsyncSession], Mock()),
+        "opa_client": opa,
+        "current_user": USER,
+        "subject": subject_attributes(USER, "engineering"),
+        "action": "document.create",
+        "resource": RESOURCE,
+        "purpose": "document_upload",
+        "correlation_id": "authorize-test",
+    }
+    arguments.update(overrides)
+    return await authorize(**arguments)  # type: ignore[arg-type]
+
+
+@pytest.fixture
+def audit(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
+    recorder = AsyncMock()
+    monkeypatch.setattr("app.policy.authorization.record_authorization_event", recorder)
+    return recorder
 
 
 @pytest.mark.asyncio
-async def test_denial_never_loads_content_and_uses_database_department(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    session, factory, user, opa, audit = setup_read(allowed=False)
-    monkeypatch.setattr("app.policy.service.record_authorization_event", audit)
+async def test_authorize_sends_action_purpose_and_database_department(audit: AsyncMock) -> None:
+    opa = opa_returning(allow=True)
 
-    with pytest.raises(ResourceNotFoundError):
-        await read_demo_resource(session, factory, user, opa, SALARY_ID, "policy-test")
+    decision = await run_authorize(opa)
 
-    assert session.scalar.await_count == 1
+    assert decision.allow is True
     policy_input = cast(AuthorizationInput, opa.evaluate.await_args.args[0])  # type: ignore[attr-defined]
+    assert policy_input.action == "document.create"
+    assert policy_input.environment.purpose == "document_upload"
     assert policy_input.subject.department == "engineering"
     audit.assert_awaited_once()
-    assert audit.await_args.kwargs["allowed"] is False
-
-
-@pytest.mark.asyncio
-async def test_allowed_read_fetches_content_after_audit(monkeypatch: pytest.MonkeyPatch) -> None:
-    session, factory, user, opa, audit = setup_read(allowed=True)
-    monkeypatch.setattr("app.policy.service.record_authorization_event", audit)
-
-    resource = await read_demo_resource(session, factory, user, opa, SALARY_ID, "policy-test")
-
-    assert resource.content.startswith("SYNTHETIC ONLY")
-    assert session.scalar.await_count == 2
-    audit.assert_awaited_once()
+    assert audit.await_args.kwargs["action"] == "document.create"
     assert audit.await_args.kwargs["allowed"] is True
+    assert audit.await_args.kwargs["policy_version"] == "guard-v1"
 
 
 @pytest.mark.asyncio
-async def test_audit_failure_prevents_content_read(monkeypatch: pytest.MonkeyPatch) -> None:
-    session, factory, user, opa, _ = setup_read(allowed=True)
-    monkeypatch.setattr(
-        "app.policy.service.record_authorization_event",
-        AsyncMock(side_effect=AuditUnavailableError()),
+async def test_authorize_audits_denials(audit: AsyncMock) -> None:
+    decision = await run_authorize(opa_returning(allow=False))
+
+    assert decision.allow is False
+    assert audit.await_args.kwargs["allowed"] is False
+    assert audit.await_args.kwargs["reason_code"] == "access_denied"
+
+
+@pytest.mark.asyncio
+async def test_missing_resource_is_denied_even_if_policy_allows(audit: AsyncMock) -> None:
+    decision = await run_authorize(
+        opa_returning(allow=True),
+        resource=unavailable_resource(SALARY_ID, TENANT_ID),
+        resource_found=False,
     )
 
-    with pytest.raises(AuditUnavailableError):
-        await read_demo_resource(session, factory, user, opa, SALARY_ID, "policy-test")
-
-    assert session.scalar.await_count == 1
-
-
-@pytest.mark.asyncio
-async def test_missing_resource_still_checks_policy_availability(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    session, factory, user, opa, audit = setup_read(allowed=False)
-    session.scalar.side_effect = [None]
-    monkeypatch.setattr("app.policy.service.record_authorization_event", audit)
-
-    with pytest.raises(ResourceNotFoundError):
-        await read_demo_resource(session, factory, user, opa, SALARY_ID, "missing-test")
-
-    assert session.scalar.await_count == 1
-    opa.evaluate.assert_awaited_once()  # type: ignore[attr-defined]
+    assert decision.allow is False
+    assert decision.reason_code == "resource_unavailable"
+    assert audit.await_args.kwargs["allowed"] is False
     assert audit.await_args.kwargs["reason_code"] == "resource_unavailable"
 
 
 @pytest.mark.asyncio
-async def test_missing_resource_reports_policy_outage_without_content(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    session, factory, user, opa, audit = setup_read(allowed=False)
-    session.scalar.side_effect = [None]
+async def test_policy_outage_is_audited_then_raised(audit: AsyncMock) -> None:
+    opa = opa_returning(allow=True)
     opa.evaluate.side_effect = PolicyUnavailableError()  # type: ignore[attr-defined]
-    monkeypatch.setattr("app.policy.service.record_authorization_event", audit)
 
     with pytest.raises(PolicyUnavailableError):
-        await read_demo_resource(session, factory, user, opa, SALARY_ID, "outage-test")
+        await run_authorize(opa)
 
-    assert session.scalar.await_count == 1
     assert audit.await_args.kwargs["reason_code"] == "policy_unavailable"
+    assert audit.await_args.kwargs["policy_version"] is None
+    assert audit.await_args.kwargs["allowed"] is False
+
+
+@pytest.mark.asyncio
+async def test_audit_failure_withholds_the_decision(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "app.policy.authorization.record_authorization_event",
+        AsyncMock(side_effect=AuditUnavailableError()),
+    )
+
+    with pytest.raises(AuditUnavailableError):
+        await run_authorize(opa_returning(allow=True))
 
 
 @pytest.mark.asyncio
