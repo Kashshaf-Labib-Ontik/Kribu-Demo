@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from app.audit import models as audit_models  # noqa: F401
 from app.core.config import get_settings
 from app.core.database import Base
+from app.documents import models as document_models  # noqa: F401
 from app.identity import models as identity_models  # noqa: F401
 from app.policy import models as policy_models  # noqa: F401
 
@@ -18,7 +19,9 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-database_url = os.getenv("KRIBU_MIGRATION_DATABASE_URL") or get_settings().database_url
+database_url = (
+    os.getenv("KRIBU_MIGRATION_DATABASE_URL") or get_settings().database_url.get_secret_value()
+)
 config.set_main_option("sqlalchemy.url", database_url)
 target_metadata = Base.metadata
 

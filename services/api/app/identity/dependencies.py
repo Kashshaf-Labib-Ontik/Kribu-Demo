@@ -5,11 +5,11 @@ from typing import Annotated, cast
 
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.identity.contracts import CurrentUser
 from app.identity.errors import AuthenticationRequiredError
+from app.identity.tenancy import tenant_transaction
 from app.identity.tokens import OidcTokenVerifier
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -39,17 +39,5 @@ async def get_tenant_session(
         Depends(get_session_factory),
     ],
 ) -> AsyncIterator[AsyncSession]:
-    async with session_factory() as session, session.begin():
-        await set_tenant_context(session, current_user)
+    async with tenant_transaction(session_factory, current_user) as session:
         yield session
-
-
-async def set_tenant_context(session: AsyncSession, current_user: CurrentUser) -> None:
-    await session.execute(
-        text("SELECT set_config('app.tenant_id', :tenant_id, true)"),
-        {"tenant_id": str(current_user.tenant_id)},
-    )
-    await session.execute(
-        text("SELECT set_config('app.user_id', :user_id, true)"),
-        {"user_id": current_user.subject_id},
-    )

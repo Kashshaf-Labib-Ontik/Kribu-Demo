@@ -2,31 +2,40 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from uuid import uuid4
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import create_async_engine
-from starlette.middleware.base import RequestResponseEndpoint
-from starlette.responses import Response
 
 from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.database import create_session_factory
-from app.identity.errors import IdentityError
+from app.core.db_guard import assert_restricted_role
+from app.core.errors import AppError, problem_response
+from app.core.logging import configure_logging
+from app.core.request_context import RequestContextMiddleware
+from app.core.version import API_VERSION
+from app.documents.storage import LocalFileObjectStore
+from app.documents.upload_guard import UploadGuardMiddleware
 from app.identity.tokens import OidcTokenVerifier
 from app.policy.client import OpaClient
-from app.policy.errors import PolicyError
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
-    engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+    engine = create_async_engine(settings.database_url.get_secret_value(), pool_pre_ping=True)
+    try:
+        await assert_restricted_role(engine)
+    except BaseException:
+        await engine.dispose()
+        raise
     app.state.database_engine = engine
     app.state.database_session_factory = create_session_factory(engine)
     app.state.token_verifier = OidcTokenVerifier(settings)
+    app.state.object_store = LocalFileObjectStore(settings.document_store_path)
     app.state.opa_client = OpaClient(
         str(settings.opa_url),
         settings.opa_timeout_seconds,
@@ -39,61 +48,46 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    configure_logging(settings)
     application = FastAPI(
         title="KRIBU API",
-        version="0.1.0",
+        version=API_VERSION,
         docs_url="/docs" if settings.environment == "development" else None,
         redoc_url=None,
         lifespan=lifespan,
     )
+    # Innermost first: the upload guard sees request IDs; CORS wraps everything, 500s too.
+    application.add_middleware(UploadGuardMiddleware, max_file_bytes=settings.upload_max_bytes)
+    application.add_middleware(RequestContextMiddleware)
     application.add_middleware(
         CORSMiddleware,
-        allow_origins=[str(origin) for origin in settings.cors_origins],
+        # pydantic renders AnyHttpUrl with a trailing "/"; browser Origin headers have none.
+        allow_origins=[str(origin).rstrip("/") for origin in settings.cors_origins],
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Correlation-ID"],
+        expose_headers=["X-Correlation-ID", "X-Request-ID"],
     )
 
-    @application.exception_handler(IdentityError)
-    async def identity_error(request: Request, exc: IdentityError) -> JSONResponse:
-        headers = {"WWW-Authenticate": "Bearer"} if exc.status_code == 401 else None
-        return JSONResponse(
+    @application.exception_handler(AppError)
+    async def app_error(request: Request, exc: AppError) -> JSONResponse:
+        return problem_response(
             status_code=exc.status_code,
-            headers=headers,
-            content={
-                "type": "about:blank",
-                "title": "Unauthorized" if exc.status_code == 401 else "Forbidden",
-                "status": exc.status_code,
-                "detail": exc.safe_message,
-                "code": exc.code,
-                "correlation_id": request.state.correlation_id,
-            },
+            code=exc.code,
+            detail=exc.safe_message,
+            correlation_id=request.state.correlation_id,
+            headers={"WWW-Authenticate": "Bearer"} if exc.status_code == 401 else None,
         )
 
-    @application.exception_handler(PolicyError)
-    async def policy_error(request: Request, exc: PolicyError) -> JSONResponse:
-        return JSONResponse(
-            status_code=exc.status_code,
-            content={
-                "type": "about:blank",
-                "title": "Not Found" if exc.status_code == 404 else "Service unavailable",
-                "status": exc.status_code,
-                "detail": exc.safe_message,
-                "code": exc.code,
-                "correlation_id": request.state.correlation_id,
-            },
+    @application.exception_handler(RequestValidationError)
+    async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
+        # Never echo the rejected input back to the caller.
+        return problem_response(
+            status_code=422,
+            code="request_invalid",
+            detail="The request is invalid.",
+            correlation_id=request.state.correlation_id,
         )
-
-    @application.middleware("http")
-    async def correlation_id(
-        request: Request,
-        call_next: RequestResponseEndpoint,
-    ) -> Response:
-        request_id = request.headers.get("X-Correlation-ID") or str(uuid4())
-        request.state.correlation_id = request_id[:128]
-        response = await call_next(request)
-        response.headers["X-Correlation-ID"] = request.state.correlation_id
-        return response
 
     application.include_router(api_router, prefix="/v1")
     return application

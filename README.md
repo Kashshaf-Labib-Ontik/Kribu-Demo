@@ -44,7 +44,7 @@ Start the complete local foundation:
 docker compose up --build
 ```
 
-The Studio runs at `http://localhost:3000`, the API at `http://localhost:8000`, Keycloak at `http://localhost:8180`, and API documentation at `http://localhost:8000/docs` in development. Compose also runs OPA internally, bootstraps the restricted API database role, applies Alembic migrations, and imports the synthetic Keycloak realm.
+The Studio runs at `http://localhost:3000`, the API at `http://localhost:8000`, Keycloak at `http://localhost:8180`, and API documentation at `http://localhost:8000/docs` in development. Compose also runs OPA internally, bootstraps the restricted API database role, applies Alembic migrations, runs the idempotent synthetic seed (`scripts/seed_demo.py`) as the schema owner, and imports the synthetic Keycloak realm. Historical migrations retain their original demo fixtures; forward migrations tighten grants without requiring existing volumes to be deleted.
 
 Add a Google AI Studio key to your uncommitted `.env` as `KRIBU_GEMINI_API_KEY`. Verify structured output, streaming, usage metadata, and function selection with the script's built-in synthetic prompts:
 
@@ -77,10 +77,20 @@ docker compose run --rm -v ./policies/tests:/tests opa test --fail-on-empty /pol
 
 The protected API is `GET /v1/demo/resources/{resource_id}`. Seeded IDs are in `scripts/verify_guard.py`. Mike is denied the synthetic salary record, Helen can read it, and tenant-crossing reads return the same safe `404` as unavailable records. OPA has no host port; only the API makes policy decisions. The record content and salary amount are fictional.
 
+Verify the complete synthetic document lifecycle through Keycloak, OPA, PostgreSQL RLS, audit storage, and the object-store adapter:
+
+```powershell
+Set-Location services/api
+uv run python -m scripts.verify_documents --confirm-synthetic
+Set-Location ../..
+```
+
+Iteration 5 accepts one PDF, DOCX, XLSX, CSV, TXT, or Markdown file up to 25 MiB. Uploads require explicit read grants and an `Idempotency-Key`; original files and versions are immutable, storage keys never leave the API, and every create, version, or read decision is audited. The protected endpoints are `POST /v1/documents/uploads`, `POST /v1/documents/{id}/versions`, and `GET /v1/documents/{id}`.
+
 For faster application development, run PostgreSQL in Docker and the applications on the host:
 
 ```powershell
-docker compose up -d postgres db-bootstrap migrate keycloak-postgres keycloak opa
+docker compose up -d postgres db-bootstrap migrate seed keycloak-postgres keycloak opa
 uv run --package kribu-api uvicorn app.main:app --app-dir services/api --reload
 pnpm dev:web
 ```
@@ -89,10 +99,21 @@ Run the focused scaffold checks:
 
 ```powershell
 pnpm check
+pnpm test:policy
 pnpm build:web
 docker compose config --quiet
 ```
 
+Run the integration suite (real PostgreSQL RLS and grants, real OPA, test-signed tokens). It recreates a dedicated `kribu_test` database on the Compose PostgreSQL and never touches `kribu`. Compose OPA has no host port, so start a throwaway OPA for the tests:
+
+```powershell
+docker run -d --rm --name kribu-opa-test -p 127.0.0.1:8181:8181 -v ./policies/rego:/policies:ro openpolicyagent/opa:1.21.2 run --server --addr=0.0.0.0:8181 /policies
+pnpm test:integration
+docker stop kribu-opa-test
+```
+
+Overrides: `KRIBU_TEST_OWNER_DATABASE_URL` (default `postgresql://kribu:kribu_dev_only@localhost:5432/kribu`), `KRIBU_TEST_APP_DB_PASSWORD` and `KRIBU_TEST_OPA_URL`. If another PostgreSQL already listens on host port 5432, set `POSTGRES_PORT` for Compose and point `KRIBU_TEST_OWNER_DATABASE_URL` at that port. CI (`.github/workflows/ci.yml`) runs the checks, policy tests and integration suite on every push.
+
 ## Current status
 
-Iterations 0-3 are committed and pushed on `dev-v1.0.x`. Iteration 4 is implemented and live-verified in the working tree, pending owner review. It adds OPA-backed RBAC/ABAC, resource ACL metadata, a protected synthetic read path, and append-only runtime audit records. Document ingestion and natural-language query enforcement are later iterations.
+Iterations 0-5 are implemented and verified. Iteration 5 provides governed document upload, immutable versioning, idempotent replay, tenant-safe object storage, and authorized metadata reads. Iteration 6 parsing and provenance is next; retrieval and natural-language query enforcement remain later iterations.

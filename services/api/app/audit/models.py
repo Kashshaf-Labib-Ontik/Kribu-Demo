@@ -25,6 +25,7 @@ class AuthorizationAuditEvent(Base):
     reason_code: Mapped[str] = mapped_column(String(80), nullable=False)
     policy_version: Mapped[str | None] = mapped_column(String(80))
     correlation_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    request_id: Mapped[str | None] = mapped_column(String(64))
     input_metadata: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

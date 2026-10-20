@@ -64,6 +64,7 @@ The commit messages below are targets and may be adjusted to match the actual sl
 ### Iteration 5 - Document upload and versioning
 
 - Add safe upload, hashing, metadata/ACL assignment, original storage, status, and duplicate behavior.
+- Reviewed scope (eng review 2026-10-19): PDF, DOCX, XLSX, CSV, TXT and Markdown (images wait for OCR); explicit read grants; `guard-v2` upload rules; idempotency keys; own-document duplicate detection; rollback-capable versions; ASGI auth and 25 MiB guard; local content-addressed store with readiness probe.
 - **Commit:** `Add document upload lifecycle`
 
 ### Iteration 6 - Parsing and provenance
@@ -165,4 +166,4 @@ Use a small working exercise for each topic rather than completing long courses 
 
 ## 8. Current delivery gate
 
-Iterations 0-3 are owner-reviewed, committed, and pushed on `dev-v1.0.x`. Iteration 4 is implemented and live-verified in the working tree, pending owner review. It adds OPA-backed RBAC/ABAC, reusable resource ACL metadata, a protected synthetic read, and audit records. Iteration 5 begins document upload after the reviewed Guard slice is accepted. No implementation commit or push occurs without explicit owner approval.
+Iterations 0-5 are implemented and verified. Iteration 5 includes governed uploads, immutable versions, idempotency, RLS/OPA enforcement, object storage, and a forward-compatible upgrade from Iteration 4. Iteration 6 parsing and provenance is the next delivery phase. Implementation commits and pushes still require explicit owner approval.

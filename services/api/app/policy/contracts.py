@@ -4,6 +4,11 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+# Realm roles seeded in infra/keycloak/kribu-demo-realm.json; role grants must name one.
+CANONICAL_ROLES = frozenset(
+    {"employee", "manager", "hr_manager", "approver", "administrator", "auditor"}
+)
+
 
 class SubjectAttributes(BaseModel):
     tenant_id: UUID

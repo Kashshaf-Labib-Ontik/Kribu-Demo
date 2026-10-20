@@ -9,12 +9,18 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi.testclient import TestClient
 from jwt import PyJWK
+from jwt.exceptions import PyJWKClientConnectionError
 
 from app.core.config import Settings
 from app.identity.contracts import CurrentUser
-from app.identity.dependencies import get_current_user, get_tenant_session
-from app.identity.errors import InvalidAccessTokenError
+from app.identity.dependencies import get_current_user, get_tenant_session, get_token_verifier
+from app.identity.errors import (
+    IdentityNotProvisionedError,
+    IdentityProviderUnavailableError,
+    InvalidAccessTokenError,
+)
 from app.identity.models import Tenant, UserProfile
+from app.identity.service import get_identity_profile
 from app.identity.tokens import OidcTokenVerifier
 from app.main import app
 
@@ -167,3 +173,109 @@ def test_identity_endpoint_returns_provisioned_profile() -> None:
         "department": "engineering",
         "roles": ["employee"],
     }
+
+
+def _claims(**overrides: object) -> dict[str, object]:
+    now = datetime.now(UTC)
+    claims: dict[str, object] = {
+        "iss": ISSUER,
+        "aud": AUDIENCE,
+        "sub": SUBJECT_ID,
+        "iat": now,
+        "exp": now + timedelta(minutes=5),
+        "preferred_username": "mike",
+        "tenant_id": str(TENANT_ID),
+        "realm_access": {"roles": ["employee"]},
+    }
+    claims.update(overrides)
+    return claims
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "token",
+    [
+        jwt.encode(_claims(), "shared-secret-of-at-least-32-bytes!!", algorithm="HS256"),
+        jwt.encode(_claims(), None, algorithm="none"),
+        create_token(tenant_id=None),
+        jwt.encode(
+            {key: value for key, value in _claims().items() if key != "tenant_id"},
+            PRIVATE_KEY,
+            algorithm="RS256",
+            headers={"kid": "test-key"},
+        ),
+    ],
+    ids=["hs256", "alg-none", "null-tenant", "missing-tenant"],
+)
+async def test_tokens_with_wrong_algorithm_or_missing_tenant_are_rejected(token: str) -> None:
+    with pytest.raises(InvalidAccessTokenError):
+        await create_verifier().verify(token)
+
+
+@pytest.mark.asyncio
+async def test_jwks_outage_is_a_service_error_not_an_invalid_token() -> None:
+    verifier = create_verifier()
+    verifier._jwks_client.get_signing_key_from_jwt = Mock(  # type: ignore[method-assign]
+        side_effect=PyJWKClientConnectionError("Fail to fetch data from the url")
+    )
+
+    with pytest.raises(IdentityProviderUnavailableError):
+        await verifier.verify(create_token())
+
+
+def test_jwks_outage_returns_503_problem() -> None:
+    verifier = create_verifier()
+    verifier._jwks_client.get_signing_key_from_jwt = Mock(  # type: ignore[method-assign]
+        side_effect=PyJWKClientConnectionError("Fail to fetch data from the url")
+    )
+    app.dependency_overrides[get_token_verifier] = lambda: verifier
+    try:
+        with TestClient(app) as client:
+            response = client.get(
+                "/v1/identity/me", headers={"Authorization": f"Bearer {create_token()}"}
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "identity_provider_unavailable"
+    assert "WWW-Authenticate" not in response.headers
+
+
+def _session_returning(row: object) -> AsyncMock:
+    result = Mock()
+    result.one_or_none.return_value = row
+    session = AsyncMock()
+    session.execute.return_value = result
+    return session
+
+
+@pytest.mark.asyncio
+async def test_unprovisioned_or_inactive_identity_is_forbidden() -> None:
+    user = CurrentUser(
+        subject_id=SUBJECT_ID, tenant_id=TENANT_ID, username="mike", roles=frozenset({"employee"})
+    )
+
+    with pytest.raises(IdentityNotProvisionedError):
+        await get_identity_profile(_session_returning(None), user)
+
+
+@pytest.mark.asyncio
+async def test_identity_in_another_tenant_is_forbidden() -> None:
+    other_tenant = UUID("22222222-2222-4222-8222-222222222222")
+    user = CurrentUser(
+        subject_id=SUBJECT_ID, tenant_id=TENANT_ID, username="mike", roles=frozenset({"employee"})
+    )
+    tenant = Tenant(id=other_tenant, slug="isolation-test", name="Isolation Test Organization")
+    profile = UserProfile(
+        id=UUID(SUBJECT_ID),
+        tenant_id=other_tenant,
+        external_subject=SUBJECT_ID,
+        username="mike",
+        display_name="Mike Rahman",
+        department="engineering",
+        is_active=True,
+    )
+
+    with pytest.raises(IdentityNotProvisionedError):
+        await get_identity_profile(_session_returning((profile, tenant)), user)

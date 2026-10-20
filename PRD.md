@@ -1,6 +1,6 @@
 # KRIBU Demo Product Requirements
 
-**Status:** Iteration 4 Guard implementation is live-verified in the working tree, pending owner review
+**Status:** Iterations 0-5 are implemented and verified; Iteration 6 parsing and provenance is next
 
 **Scope:** Local, synthetic-data demo
 

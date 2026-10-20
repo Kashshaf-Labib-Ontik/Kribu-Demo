@@ -1,6 +1,6 @@
 package kribu.authz
 
-policy_version := "guard-v1"
+policy_version := "guard-v2"
 
 default allow := false
 
@@ -14,17 +14,66 @@ default reason_code := "access_denied"
 
 reason_code := "allowed" if allow
 
-allow if {
-    valid_input
-    input.resource.classification == "internal"
-    matching_grant
+# Each action is only valid for its own declared purposes.
+action_purposes := {
+    "resource.read": {"demo_resource_read", "document_read"},
+    "document.create": {"document_upload"},
+    "document.version.create": {"document_upload"},
 }
+
+mapped_classifications := {"internal", "restricted_hr"}
 
 allow if {
     valid_input
+    input.action == "resource.read"
+    may_read
+}
+
+# Uploads never grant reads. Auditors stay read-only observers regardless of other roles.
+allow if {
+    valid_input
+    input.action == "document.create"
+    not "auditor" in input.subject.roles
+    may_upload
+}
+
+# A new version changes what readers see, so only people who can already read it may add one.
+allow if {
+    valid_input
+    input.action == "document.version.create"
+    not "auditor" in input.subject.roles
+    may_upload
+    may_read
+}
+
+# Reads: always an explicit ACL grant; restricted HR also needs the HR manager role.
+may_read if {
+    input.resource.classification == "internal"
+    read_grant
+}
+
+may_read if {
     input.resource.classification == "restricted_hr"
     "hr_manager" in input.subject.roles
-    matching_grant
+    read_grant
+}
+
+may_upload if {
+    "administrator" in input.subject.roles
+    input.resource.classification in mapped_classifications
+}
+
+may_upload if {
+    "hr_manager" in input.subject.roles
+    input.resource.classification == "restricted_hr"
+}
+
+# Department self-service: internal documents for the subject's own (database) department.
+may_upload if {
+    input.resource.classification == "internal"
+    is_string(input.subject.department)
+    input.subject.department != ""
+    input.subject.department == input.resource.department
 }
 
 valid_input if {
@@ -38,27 +87,26 @@ valid_input if {
     is_string(input.resource.resource_type)
     input.resource.resource_type != ""
     is_array(input.resource.grants)
-    input.action == "resource.read"
-    input.environment.purpose == "demo_resource_read"
+    input.environment.purpose in action_purposes[input.action]
 }
 
-matching_grant if {
+read_grant if {
     some grant in input.resource.grants
-    grant.action == input.action
+    grant.action == "resource.read"
     grant.principal_type == "subject"
     grant.principal_id == input.subject.subject_id
 }
 
-matching_grant if {
+read_grant if {
     some grant in input.resource.grants
-    grant.action == input.action
+    grant.action == "resource.read"
     grant.principal_type == "role"
     grant.principal_id in input.subject.roles
 }
 
-matching_grant if {
+read_grant if {
     some grant in input.resource.grants
-    grant.action == input.action
+    grant.action == "resource.read"
     grant.principal_type == "department"
     is_string(input.subject.department)
     input.subject.department != ""

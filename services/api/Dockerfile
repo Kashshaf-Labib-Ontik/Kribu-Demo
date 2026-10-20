@@ -13,7 +13,10 @@ RUN uv sync --frozen --no-dev --package kribu-api
 COPY services/api services/api
 WORKDIR /workspace/services/api
 
-RUN useradd --create-home --uid 10001 kribu && chown -R kribu:kribu /workspace
+# The document store directory exists in the image so a fresh named volume inherits uid 10001.
+RUN useradd --create-home --uid 10001 kribu \
+    && mkdir -p /var/lib/kribu/documents \
+    && chown -R kribu:kribu /workspace /var/lib/kribu
 USER kribu
 
 EXPOSE 8000

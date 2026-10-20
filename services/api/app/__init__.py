@@ -1,2 +1,1 @@
 """KRIBU API application package."""
-

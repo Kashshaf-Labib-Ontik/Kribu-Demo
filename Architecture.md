@@ -1,6 +1,6 @@
 # KRIBU Demo Architecture
 
-**Status:** Iteration 4 Guard implementation is live-verified in the working tree, pending owner review
+**Status:** Iterations 0-5 are implemented and verified; Iteration 6 parsing and provenance is next
 
 **Primary orchestration:** LangGraph
 
@@ -88,11 +88,11 @@ For a query such as "What is Mr Albert's salary?", Mike's role and department do
 - Policy bundles are versioned per tenant and domain, not hard-coded around employee names or one database schema.
 - Missing mappings deny access and enter an administrative review queue.
 
-### Implemented Guard slice (Iteration 4)
+### Implemented Guard slice (Iterations 4-5)
 
-OPA `1.21.2` runs on a private Compose network shared only with the API; it has no host port. `OpaClient` sends typed canonical attributes to `data.kribu.authz.decision` and rejects missing/malformed results, timeouts, and unexpected policy versions. API readiness checks the loaded `guard-v1` policy version. The initial Rego policy recognizes `internal` and `restricted_hr`; every read needs a matching ACL grant, and `restricted_hr` also needs the `hr_manager` role. An administrator or auditor has no implicit content access.
+OPA `1.21.2` runs on a private Compose network shared only with the API; it has no host port. `OpaClient` sends typed canonical attributes to `data.kribu.authz.decision` and rejects missing/malformed results, timeouts, and unexpected policy versions. API readiness checks the loaded `guard-v2` policy version (bumped in step across `authz.rego`, settings, `.env.example` and Compose). The Rego policy recognizes `internal` and `restricted_hr`; every read needs a matching ACL grant, and `restricted_hr` also needs the `hr_manager` role. An administrator or auditor has no implicit content access. Each action is valid only for its declared purposes (`resource.read`: `demo_resource_read`, `document_read`; `document.create` and `document.version.create`: `document_upload`). Uploads are allowed for administrators on any mapped classification, HR managers on `restricted_hr`, and any user on `internal` documents of their own database department; a subject holding `auditor` never uploads. Upload permission never grants reading, and adding a version additionally requires read access to the existing document.
 
-The protected `GET /v1/demo/resources/{resource_id}` path resolves an active database profile, fetches only the resource descriptor and ACL under tenant RLS, evaluates policy, records a separate audit transaction, and then fetches synthetic content on allow. The profile's database department is used, not the token's potentially stale department. Unknown resource labels deny. Missing or inaccessible resources share a safe `404`; policy or audit failure gives `503` without releasing content. Even an absent resource makes a policy call, so a policy outage does not distinguish its existence through response status.
+Every protected operation calls `app/policy/authorization.py` `authorize()`: one OPA decision and one audit row carrying the caller's action, failing closed on policy or audit outage. The protected `GET /v1/demo/resources/{resource_id}` path uses three short tenant transactions (profile + descriptor + grants; the audit write; content on allow) and holds no connection while OPA answers. Inactive or unprovisioned identities are audited as `identity_not_provisioned` before the `403`. The profile's database department is used, not the token's potentially stale department. Unknown resource labels deny. Missing or inaccessible resources share a safe `404`; policy or audit failure gives `503` without releasing content. Even an absent resource makes a policy call, so a policy outage does not distinguish its existence through response status.
 
 `resource_descriptors` and `resource_acl_grants` are the reusable metadata boundary for future documents. `demo_resource_content` is temporary synthetic proof data. `authorization_audit_events` is tenant-scoped; the runtime role may insert/select but cannot update/delete. Audit input holds identifiers and policy metadata, never token, query text, or content. Natural-language paraphrase resistance is completed when Brain and Engine route every resolved resource through this Guard and apply authorization inside search.
 
@@ -113,6 +113,22 @@ flowchart LR
     I --> R[Authorized hybrid retrieval]
     F --> R
 ```
+
+### Implemented upload lifecycle (Iteration 5)
+
+```text
+UploadGuard (ASGI)   no/invalid bearer -> 401 | body > 25 MiB (+64 KiB) -> 413
+  -> validate metadata + explicit read grants (no implicit uploader access)
+  -> hash + sniff bytes (stdlib: PDF, DOCX, XLSX, CSV, TXT, MD)  -> 415 / 422
+  -> Idempotency-Key lookup (fingerprint includes the file SHA-256) -> replay | 422
+  -> authorize(document.create | document.version.create)  (audited)
+  -> create: duplicate only among the caller's own documents with the same access -> 200 duplicate_of
+  -> LocalFileObjectStore.put  tenants/{tenant}/sha256/{hh}/{hex}  (fsync + replace)
+  -> one transaction: descriptor + grants + document + version + upload_request
+     version: UPDATE latest_version_number (row lock); same bytes as latest -> 200
+```
+
+A document is a Guard resource: its `resource_descriptors` row and grants are the ACL anchor and every version inherits it. `documents` holds BRN-06 metadata (`domain`, `project`, `document_date`) and the version counter; `document_versions` are append-only for the runtime role, which may update only `documents.latest_version_number` (a trigger allows only +1). Restrictive RLS policies bind new descriptors and grants to the acting subject, and stored upload responses are visible only to their sender. Duplicate detection never consults documents the caller did not create, so neither responses, timing, nor audit rows reveal hidden documents; a re-upload with a different classification, department, or grant set becomes a new document. Storage keys and paths never leave the API. Readiness probes the store. Published migrations remain immutable; `0004_upgrade_compatibility` upgrades existing Iteration 4 databases, tightens runtime grants, and adds tenant-safe version references without a volume reset. Parsing, quarantine, preview and downloads arrive with Iteration 6.
 
 Original files are immutable. A `DocumentVersion` owns normalized blocks; each `Chunk` points to a page/section/table/sheet/row/cell locator. Embeddings are derived and replaceable. Facts never replace citations to their original source.
 
@@ -265,7 +281,7 @@ Every tenant-owned table carries `tenant_id`. Source-derived rows carry `documen
 
 ## 10. API surface
 
-- `POST /v1/documents/uploads`, `GET /v1/documents/{id}`
+- `POST /v1/documents/uploads`, `POST /v1/documents/{id}/versions`, `GET /v1/documents/{id}`
 - `POST /v1/runs`, `GET /v1/runs/{id}`, `GET /v1/runs/{id}/events` (SSE)
 - `GET /v1/runs/{id}/findings`, `GET /v1/evidence/{id}`
 - `GET /v1/artifacts/{id}`
