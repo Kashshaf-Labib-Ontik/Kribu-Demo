@@ -35,6 +35,14 @@ class ResourceAclGrant(Base):
             ["resource_descriptors.tenant_id", "resource_descriptors.id"],
             ondelete="CASCADE",
         ),
+        UniqueConstraint(
+            "tenant_id",
+            "resource_id",
+            "principal_type",
+            "principal_id",
+            "action",
+            name="uq_resource_acl_grants_principal_action",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), primary_key=True)

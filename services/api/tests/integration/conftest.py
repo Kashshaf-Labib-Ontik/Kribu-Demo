@@ -103,6 +103,11 @@ def seeded_database(pytestconfig: pytest.Config) -> dict[str, dict[str, int]]:
         # No ini file: alembic's fileConfig would reconfigure logging inside pytest.
         config = Config()
         config.set_main_option("script_location", str(API_ROOT / "migrations"))
+        # Prove a new database reaches head and can be rebuilt from its downgrade path.
+        command.upgrade(config, "head")
+        command.downgrade(config, "base")
+        # Then reproduce the supported Iteration 4 -> Iteration 5 upgrade boundary.
+        command.upgrade(config, "0002_guard_resources")
         command.upgrade(config, "head")
     finally:
         if previous is None:
@@ -207,7 +212,7 @@ def token_for() -> Callable[..., str]:
 
 
 @pytest.fixture
-def owner_db() -> Any:
+def owner_db(seeded_database: dict[str, dict[str, int]]) -> Any:
     """Owner-role helpers bound to kribu_test (RLS-bypassing; for setup and assertions)."""
 
     class OwnerDatabase:

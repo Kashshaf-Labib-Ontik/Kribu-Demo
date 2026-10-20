@@ -17,8 +17,9 @@
     "test:policy": "docker compose run --rm -v ./policies/tests:/tests opa test --fail-on-empty /policies /tests",
     "lint:api": "uv run --package kribu-api ruff check services/api",
     "format:api": "uv run --package kribu-api ruff format services/api",
+    "format:check:api": "uv run --package kribu-api ruff format --check services/api",
     "typecheck:api": "uv run --package kribu-api mypy services/api/app",
-    "check": "pnpm lint:web && pnpm typecheck:web && pnpm test:api && pnpm lint:api && pnpm typecheck:api"
+    "check": "pnpm lint:web && pnpm typecheck:web && pnpm test:api && pnpm lint:api && pnpm format:check:api && pnpm typecheck:api"
   }
 }
 

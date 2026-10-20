@@ -43,9 +43,31 @@ async def in_tenant(connection: asyncpg.Connection, tenant_id: str, user_id: str
 
 
 def test_seed_is_idempotent(seeded_database: dict[str, dict[str, int]]) -> None:
-    assert seeded_database["first"]["tenants"] == 2
-    assert seeded_database["first"]["resource_descriptors"] == 4
+    # Historical migrations already contain these fixtures; the separate seed command
+    # remains safe whether the rows exist or a future schema starts empty.
+    assert seeded_database["first"]["tenants"] in {0, 2}
+    assert seeded_database["first"]["resource_descriptors"] in {0, 4}
     assert all(count == 0 for count in seeded_database["second"].values())
+
+
+def test_upgrade_compatibility_schema_and_constraints(owner_db: object) -> None:
+    rows = owner_db.fetch(  # type: ignore[attr-defined]
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_name = 'authorization_audit_events' AND column_name = 'request_id'"
+    )
+    constraints = owner_db.fetch(  # type: ignore[attr-defined]
+        "SELECT conname FROM pg_constraint WHERE conname = ANY($1::text[])",
+        [
+            "uq_document_versions_tenant_id_id",
+            "fk_upload_requests_document_version",
+        ],
+    )
+
+    assert [row["column_name"] for row in rows] == ["request_id"]
+    assert {row["conname"] for row in constraints} == {
+        "uq_document_versions_tenant_id_id",
+        "fk_upload_requests_document_version",
+    }
 
 
 @pytest.mark.asyncio

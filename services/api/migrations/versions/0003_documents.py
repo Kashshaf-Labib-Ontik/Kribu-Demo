@@ -24,14 +24,11 @@ TENANT = "NULLIF(current_setting('app.tenant_id', true), '')::uuid"
 SUBJECT = "current_setting('app.user_id', true)"
 
 
-def _policy(
-    table: str, name: str, command: str, clause: str, *, restrictive: bool = False
-) -> None:
+def _policy(table: str, name: str, command: str, clause: str, *, restrictive: bool = False) -> None:
     kind = "AS RESTRICTIVE " if restrictive else ""
     op.execute(
         sa.text(
-            f'CREATE POLICY "{table}_{name}" ON "{table}" {kind}'
-            f"FOR {command} TO kribu_app {clause}"
+            f'CREATE POLICY "{table}_{name}" ON "{table}" {kind}FOR {command} TO kribu_app {clause}'
         )
     )
 
@@ -212,12 +209,8 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.execute(sa.text('REVOKE INSERT ON TABLE "resource_acl_grants" FROM kribu_app'))
     op.execute(sa.text('REVOKE INSERT ON TABLE "resource_descriptors" FROM kribu_app'))
-    op.execute(
-        sa.text('DROP POLICY "resource_acl_grants_insert_owner" ON "resource_acl_grants"')
-    )
-    op.execute(
-        sa.text('DROP POLICY "resource_descriptors_insert_owner" ON "resource_descriptors"')
-    )
+    op.execute(sa.text('DROP POLICY "resource_acl_grants_insert_owner" ON "resource_acl_grants"'))
+    op.execute(sa.text('DROP POLICY "resource_descriptors_insert_owner" ON "resource_descriptors"'))
     op.drop_table("upload_requests")
     op.drop_table("document_versions")
     op.drop_table("documents")

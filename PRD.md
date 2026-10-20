@@ -1,6 +1,6 @@
 # KRIBU Demo Product Requirements
 
-**Status:** Iterations 0-4 and the pre-Iteration 5 hardening are committed on `dev-v1.0.x`; Iteration 5 document upload is implemented and verified in the working tree, pending owner review
+**Status:** Iterations 0-5 are implemented and verified; Iteration 6 parsing and provenance is next
 
 **Scope:** Local, synthetic-data demo
 

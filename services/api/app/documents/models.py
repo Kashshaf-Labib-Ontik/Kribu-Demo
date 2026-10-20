@@ -9,6 +9,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKeyConstraint,
+    Index,
     Integer,
     LargeBinary,
     SmallInteger,
@@ -35,6 +36,7 @@ class Document(Base):
             ondelete="RESTRICT",
         ),
         UniqueConstraint("tenant_id", "id"),
+        Index("ix_documents_tenant_id", "tenant_id"),
     )
 
     id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), primary_key=True)
@@ -60,6 +62,8 @@ class DocumentVersion(Base):
             ondelete="RESTRICT",
         ),
         UniqueConstraint("document_id", "version_number"),
+        UniqueConstraint("tenant_id", "id", name="uq_document_versions_tenant_id_id"),
+        Index("ix_document_versions_tenant_sha256", "tenant_id", "sha256"),
     )
 
     id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), primary_key=True)
@@ -82,7 +86,15 @@ class UploadRequest(Base):
     """Idempotency record: the first successful response for one (actor, key)."""
 
     __tablename__ = "upload_requests"
-    __table_args__ = (UniqueConstraint("tenant_id", "actor_subject_id", "idempotency_key"),)
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "document_version_id"],
+            ["document_versions.tenant_id", "document_versions.id"],
+            ondelete="RESTRICT",
+            name="fk_upload_requests_document_version",
+        ),
+        UniqueConstraint("tenant_id", "actor_subject_id", "idempotency_key"),
+    )
 
     id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), primary_key=True)
     tenant_id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), nullable=False)

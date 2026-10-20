@@ -4,11 +4,11 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Current status
 
-- **Lifecycle:** Iterations 0-4 are committed (Iteration 4 as `c38d543`). Pre-Iteration 5 hardening (engineering review D1-D22) is in progress: Groups 1-3 are committed (`3ced2fb`, `a260fe2`, `387bc81`). Iteration 5 "Add document upload lifecycle" is implemented and verified in the working tree, pending owner review.
-- **Active area:** Hardening Groups 1-3 (safety net, error/logging boundaries, Guard `authorize()` refactor), then Iteration 5 document upload per the reviewed plan.
+- **Lifecycle:** Iterations 0-5 are implemented and verified. Iteration 5 adds the governed document lifecycle and a forward-compatible upgrade from the published Iteration 4 schema.
+- **Active area:** Iteration 6 parsing, provenance, quarantine, and preview planning.
 - **Application code:** Keycloak identity, RLS, OPA RBAC/ABAC, protected synthetic resource access, and append-only authorization audit are committed.
 - **Selected stories:** NGO Project, HR Employee History, Client Complaint Patterns.
-- **Data:** Synthetic demo packs must be created; no client data sources are available.
+- **Data:** Built-in synthetic identities, Guard resources, and upload fixtures are available; no client data sources are connected.
 - **Cost constraint:** Demo uses free/open-source infrastructure and Gemini free-tier inference for synthetic data; no paid billing is enabled.
 - **Reference hardware:** 16 GB total system RAM with integrated Intel UHD graphics using shared memory; do not require local LLM inference.
 
@@ -24,10 +24,10 @@ This is the current implementation handoff. Update it in every material implemen
 - Iteration 2 was committed and pushed as `4d43182` with a typed `ModelProvider`, Gemini adapter, synthetic-only enforcement, structured output, streaming, function selection, metadata, and live verification.
 - Iteration 3 was committed and pushed as `62a3c5c` with a pinned Keycloak realm, strict OIDC validation, tenant-scoped sessions, Alembic migrations, a restricted runtime database role, and forced PostgreSQL RLS.
 - Iteration 4 was committed as `c38d543` with pinned OPA `1.21.2`, `guard-v1` Rego policy, canonical subject/resource/action inputs, ACL metadata, synthetic proof content, and tenant-scoped append-only runtime audit.
-- Hardening Group 1 (`3ced2fb`): hermetic test settings; schema-only migrations plus idempotent `scripts/seed_demo.py` and a Compose `seed` service; runtime role read-only on identity and authorization tables (insert-only on audit); audit `request_id` column; integration suite (`pnpm test:integration`, real PostgreSQL + OPA); `pnpm test:policy`; GitHub Actions CI.
+- Hardening Group 1 (`3ced2fb`): hermetic test settings; idempotent `scripts/seed_demo.py` and a Compose `seed` service; runtime least-privilege grants; audit `request_id`; integration suite (`pnpm test:integration`, real PostgreSQL + OPA); `pnpm test:policy`; GitHub Actions CI. Published migrations `0001` and `0002` remain immutable; migration `0004_upgrade_compatibility` carries the forward schema and grant corrections.
 - Hardening Group 2 (`a260fe2`): `AppError` + RFC 9457 `application/problem+json` for every error (422 never echoes input); pure ASGI request context (validated `X-Correlation-ID`, server `X-Request-ID`, logged 500 problem, CORS wraps it); correlated stdlib logging; required `database_url` (`SecretStr`) and a startup guard refusing superuser/BYPASSRLS/table-owner roles; JWKS outage returns 503 `identity_provider_unavailable`; one `tenant_transaction()`; audit rows carry `request_id`; fixed CORS origins (pydantic's trailing `/` never matched a browser `Origin`).
 - Hardening Group 3 (`387bc81`): reusable `app/policy/authorization.py` `authorize()` (one OPA decision, one audit row with the caller's action, fails closed; missing resources deny as `resource_unavailable`); the protected read uses three short tenant transactions and holds no connection during the OPA call; inactive or unprovisioned identities are audited (`identity_not_provisioned`) before the 403. Rego `guard-v1` allowed only `resource.read`.
-- Iteration 5 (uncommitted): `app/documents/` (models, contracts, errors, stdlib type validation, `LocalFileObjectStore`, ASGI `UploadGuardMiddleware`, service), routes `POST /v1/documents/uploads`, `POST /v1/documents/{id}/versions`, `GET /v1/documents/{id}`, migration `0003_documents`, Rego `guard-v2` upload rules, Compose `kribu_document_store` volume, readiness store probe, `python-multipart`, and a document case in `scripts/verify_guard.py`. Post-implementation security review (owner decisions 2026-10-19): adding a version requires read access as well as the upload rule; own-document duplicates must also match classification, department and grant set; restrictive RLS binds new descriptors/grants to the acting subject; upload replays are private to their sender; the version counter can only advance by one; corrupt OOXML, XLM macro sheets and control characters are rejected.
+- Iteration 5: `app/documents/` (models, contracts, errors, stdlib type validation, `LocalFileObjectStore`, ASGI `UploadGuardMiddleware`, service), routes `POST /v1/documents/uploads`, `POST /v1/documents/{id}/versions`, `GET /v1/documents/{id}`, migrations `0003_documents` and `0004_upgrade_compatibility`, Rego `guard-v2` upload rules, Compose `kribu_document_store` volume, readiness store probe, `python-multipart`, and live document verification. Adding a version requires read access as well as the upload rule; own-document duplicates must also match classification, department and grant set; restrictive RLS binds new descriptors/grants to the acting subject; upload replays are private to their sender; the version counter can only advance by one; corrupt OOXML, XLM macro sheets and control characters are rejected. Short temporary object-store names keep atomic writes within Windows path limits.
 
 ## Current decisions
 
@@ -42,7 +42,7 @@ This is the current implementation handoff. Update it in every material implemen
 - Local filesystem is the demo object store behind an adapter; hosted object storage is deferred.
 - All proposed external actions remain drafts behind human approval during the demo.
 - Testing stays focused on security, retrieval, citations, graph behavior, API integration, goldens, and four browser journeys.
-- No implementation commit or push occurs until the owner reviews the working-tree changes and explicitly approves it.
+- Implementation commits and pushes require explicit owner approval; the Iteration 5 correction and merge were approved on 2026-10-20.
 
 ## Superseded source decisions
 
@@ -52,9 +52,9 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Current file/area being worked on
 
-- `policies/`: implemented OPA/Rego policy and 12 focused policy tests.
-- `services/api/app/policy`: implemented OPA client, canonical contracts, metadata mapping, and protected read service.
-- `services/api/app/audit`: implemented tenant-scoped decision audit; documentation and review are active.
+- `services/api/app/documents`: Iteration 5 is complete; next work connects stored versions to parsers and provenance.
+- `services/api/migrations`: published history is preserved and upgrades are verified through `0004`.
+- `policies/`: `guard-v2` protects reads, document creation, and version creation.
 
 ## Verification performed
 
@@ -76,10 +76,12 @@ This is the current implementation handoff. Update it in every material implemen
 - Live OIDC verification succeeds for Mike and the second-tenant user; anonymous access returns `401`.
 - Live RLS verification returns zero tenants without context, exactly one matching tenant per context, and blocks a cross-tenant insert.
 - Iteration 4 OPA policy tests pass (12/12); Ruff, mypy, and 32 API tests pass with one upstream TestClient warning.
-- Both migrations applied successfully on the existing volume and a fresh temporary database; Alembic reported no schema drift. The temporary verification database was removed afterward.
+- Fresh migration, full downgrade/rebuild, and the published `0002` to `0004` upgrade path pass against isolated PostgreSQL. The existing demo volume upgraded to `0004_upgrade_compatibility` without deletion and now contains the audit `request_id` column.
 - Live Guard verifier confirms Mike salary denial, Helen HR access, Priya programs access, Evan isolation, ignored caller-supplied role/tenant parameters, persisted allow/deny audits, zero resource rows without tenant context, and no runtime audit-update privilege.
 - Stopping OPA made API readiness return `503` and a protected read return `503` without content; OPA was restored afterward.
 - OPA is isolated on an internal Compose network shared only with the API; its REST API is not published to the host.
+- Final Iteration 5 gate: 144 unit tests pass (69 integration-marked tests skipped in the unit command), all 68 PostgreSQL/OPA integration tests pass, and all 35 Rego tests pass. Ruff lint/format, mypy, ESLint, TypeScript, frozen lock, Compose validation, and the production web build pass.
+- Live identity/RLS, Guard, document lifecycle, and Gemini verifiers pass. Document verification proves anonymous denial, Helen upload/read, Mike and second-tenant denial, create/version idempotency, same-as-latest handling, and exactly versions 1-2. All long-running Compose services are healthy.
 
 ## Known open questions
 
@@ -89,7 +91,7 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Next step
 
-Owner reviews Iteration 5 and approves its commit (`Add document upload lifecycle`). Then Iteration 6 (Docling/openpyxl parsing, provenance, quarantine, preview). Local stacks need a rebuild for `guard-v2` (OPA loads policies at start) and migration `0003`. Local databases created before Group 1 need one `docker compose down -v`. On this machine a native PostgreSQL holds host port 5432, so local integration runs point `KRIBU_TEST_OWNER_DATABASE_URL` at the Compose port.
+Begin Iteration 6: Docling/openpyxl parsing, immutable provenance locators, quarantine state, and evidence preview. Local stacks need a rebuild for `guard-v2`; Alembic upgrades existing volumes through `0004` without deleting data. The integration suite uses the dedicated `kribu_test` database and a temporary localhost-only OPA container.
 
 ## Update template
 

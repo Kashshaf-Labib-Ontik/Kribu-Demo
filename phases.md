@@ -166,4 +166,4 @@ Use a small working exercise for each topic rather than completing long courses 
 
 ## 8. Current delivery gate
 
-Iterations 0-4 and the pre-Iteration 5 hardening groups are committed on `dev-v1.0.x`. Iteration 5 (document upload and versioning) is implemented and verified in the working tree, pending owner review. Iteration 6 parsing and provenance follows its acceptance. No implementation commit or push occurs without explicit owner approval.
+Iterations 0-5 are implemented and verified. Iteration 5 includes governed uploads, immutable versions, idempotency, RLS/OPA enforcement, object storage, and a forward-compatible upgrade from Iteration 4. Iteration 6 parsing and provenance is the next delivery phase. Implementation commits and pushes still require explicit owner approval.

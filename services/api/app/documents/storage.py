@@ -12,6 +12,7 @@ import hashlib
 import logging
 import os
 import shutil
+import time
 from pathlib import Path
 from typing import BinaryIO, Protocol
 from uuid import UUID, uuid4
@@ -21,6 +22,8 @@ from app.documents.errors import DocumentStoreUnavailableError
 logger = logging.getLogger(__name__)
 
 COPY_CHUNK_BYTES = 1024 * 1024
+REPLACE_ATTEMPTS = 10
+REPLACE_RETRY_SECONDS = 0.01
 
 
 class ObjectStore(Protocol):
@@ -41,7 +44,9 @@ class LocalFileObjectStore:
     def put(self, source: BinaryIO, *, tenant_id: UUID, sha256: bytes) -> str:
         key = storage_key(tenant_id, sha256)
         target = self._root / key
-        temporary = target.parent / f".{target.name}.{uuid4().hex}.tmp"
+        # Keep the temporary name short.  Repeating the 64-character digest here pushed
+        # otherwise valid pytest and user paths over Windows' legacy MAX_PATH boundary.
+        temporary = target.parent / f".{uuid4().hex}.tmp"
         try:
             target.parent.mkdir(parents=True, exist_ok=True)
             source.seek(0)
@@ -72,13 +77,21 @@ class LocalFileObjectStore:
 
     @staticmethod
     def _replace(temporary: Path, target: Path, sha256: bytes) -> None:
-        try:
-            os.replace(temporary, target)
-        except PermissionError:
-            # Windows refuses to replace a file another writer holds open. A concurrent upload of
-            # identical bytes has the same key, so an existing blob with this hash is success.
-            if not target.exists() or _sha256_of(target) != sha256:
-                raise
+        for attempt in range(REPLACE_ATTEMPTS):
+            try:
+                os.replace(temporary, target)
+                return
+            except PermissionError:
+                # Windows briefly locks a destination while another writer replaces or opens it.
+                # An existing blob with the expected hash is already the desired outcome.
+                try:
+                    if target.exists() and _sha256_of(target) == sha256:
+                        return
+                except PermissionError:
+                    pass
+                if attempt == REPLACE_ATTEMPTS - 1:
+                    raise
+                time.sleep(REPLACE_RETRY_SECONDS)
 
 
 def _create_private(path: Path) -> BinaryIO:

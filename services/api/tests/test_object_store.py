@@ -4,6 +4,7 @@ import hashlib
 import io
 import os
 import stat
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from uuid import UUID
 
@@ -40,6 +41,42 @@ def test_put_reads_from_the_start_of_the_stream(tmp_path: Path) -> None:
     key = LocalFileObjectStore(tmp_path).put(stream, tenant_id=TENANT, sha256=DIGEST)
 
     assert (tmp_path / key).read_bytes() == CONTENT
+
+
+def test_concurrent_identical_writes_converge_on_one_blob(tmp_path: Path) -> None:
+    store = LocalFileObjectStore(tmp_path)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        keys = list(
+            pool.map(
+                lambda _: store.put(io.BytesIO(CONTENT), tenant_id=TENANT, sha256=DIGEST),
+                range(16),
+            )
+        )
+
+    assert set(keys) == {storage_key(TENANT, DIGEST)}
+    assert (tmp_path / keys[0]).read_bytes() == CONTENT
+    assert [path for path in tmp_path.rglob("*") if path.is_file()] == [tmp_path / keys[0]]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows path-length regression")
+def test_windows_temporary_name_stays_below_legacy_path_limit(tmp_path: Path) -> None:
+    key = storage_key(TENANT, DIGEST)
+    target_length = len(str(tmp_path / key))
+    padding = max(1, 225 - target_length)
+    root = tmp_path / ("x" * padding)
+    target = root / key
+    old_temporary = target.parent / f".{target.name}.{'f' * 32}.tmp"
+    new_temporary = target.parent / f".{'f' * 32}.tmp"
+
+    assert len(str(old_temporary)) > 260
+    assert len(str(new_temporary)) < 260
+
+    stored_key = LocalFileObjectStore(root).put(
+        io.BytesIO(CONTENT), tenant_id=TENANT, sha256=DIGEST
+    )
+
+    assert (root / stored_key).read_bytes() == CONTENT
 
 
 def test_unwritable_root_is_a_store_outage(tmp_path: Path) -> None:

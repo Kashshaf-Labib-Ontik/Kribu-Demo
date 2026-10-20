@@ -1,6 +1,6 @@
 # KRIBU Demo Architecture
 
-**Status:** Iterations 0-4 and the pre-Iteration 5 hardening are committed on `dev-v1.0.x`; Iteration 5 document upload is implemented and verified in the working tree, pending owner review
+**Status:** Iterations 0-5 are implemented and verified; Iteration 6 parsing and provenance is next
 
 **Primary orchestration:** LangGraph
 
@@ -128,7 +128,7 @@ UploadGuard (ASGI)   no/invalid bearer -> 401 | body > 25 MiB (+64 KiB) -> 413
      version: UPDATE latest_version_number (row lock); same bytes as latest -> 200
 ```
 
-A document is a Guard resource: its `resource_descriptors` row and grants are the ACL anchor and every version inherits it. `documents` holds BRN-06 metadata (`domain`, `project`, `document_date`) and the version counter; `document_versions` are append-only for the runtime role, which may update only `documents.latest_version_number` (a trigger allows only +1). Restrictive RLS policies bind new descriptors and grants to the acting subject, and stored upload responses are visible only to their sender. Duplicate detection never consults documents the caller did not create, so neither responses, timing, nor audit rows reveal hidden documents; a re-upload with a different classification, department, or grant set becomes a new document. Storage keys and paths never leave the API. Readiness probes the store. Parsing, quarantine, preview and downloads arrive with Iteration 6.
+A document is a Guard resource: its `resource_descriptors` row and grants are the ACL anchor and every version inherits it. `documents` holds BRN-06 metadata (`domain`, `project`, `document_date`) and the version counter; `document_versions` are append-only for the runtime role, which may update only `documents.latest_version_number` (a trigger allows only +1). Restrictive RLS policies bind new descriptors and grants to the acting subject, and stored upload responses are visible only to their sender. Duplicate detection never consults documents the caller did not create, so neither responses, timing, nor audit rows reveal hidden documents; a re-upload with a different classification, department, or grant set becomes a new document. Storage keys and paths never leave the API. Readiness probes the store. Published migrations remain immutable; `0004_upgrade_compatibility` upgrades existing Iteration 4 databases, tightens runtime grants, and adds tenant-safe version references without a volume reset. Parsing, quarantine, preview and downloads arrive with Iteration 6.
 
 Original files are immutable. A `DocumentVersion` owns normalized blocks; each `Chunk` points to a page/section/table/sheet/row/cell locator. Embeddings are derived and replaceable. Facts never replace citations to their original source.
 
