@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.brain.indexing import queue_document_index
 from app.core.config import get_settings
 from app.core.database import create_session_factory
 from app.documents.errors import DocumentStoreUnavailableError
@@ -170,6 +171,14 @@ async def _publish_parse(
             )
         )
         if existing is not None:
+            await queue_document_index(
+                session,
+                tenant_id=job.tenant_id,
+                actor_subject_id=job.actor_subject_id,
+                document_id=job.document_id,
+                version_id=job.document_version_id,
+                extraction_id=existing.id,
+            )
             await mark_ready(session, job_id=job_id)
             return
         extraction = DocumentExtraction(
@@ -200,6 +209,15 @@ async def _publish_parse(
                 locator=block.locator,
             )
             for block in parsed.blocks
+        )
+        await session.flush()
+        await queue_document_index(
+            session,
+            tenant_id=job.tenant_id,
+            actor_subject_id=job.actor_subject_id,
+            document_id=job.document_id,
+            version_id=job.document_version_id,
+            extraction_id=extraction.id,
         )
         await mark_ready(session, job_id=job_id)
 

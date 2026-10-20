@@ -42,6 +42,13 @@ class Settings(BaseSettings):
     gemini_temperature: float = Field(default=0.1, ge=0, le=2)
     gemini_timeout_seconds: float = Field(default=30, ge=1, le=120)
     gemini_retry_attempts: int = Field(default=3, ge=1, le=5)
+    embedding_provider: Literal["gemini"] = "gemini"
+    gemini_embedding_model: Literal["gemini-embedding-2"] = "gemini-embedding-2"
+    gemini_embedding_dimension: int = Field(default=768, ge=768, le=768)
+    gemini_embedding_batch_size: int = Field(default=16, ge=1, le=64)
+    retrieval_candidate_limit: int = Field(default=50, ge=10, le=200)
+    retrieval_rrf_k: int = Field(default=60, ge=1, le=200)
+    retrieval_max_chunks_per_document: int = Field(default=3, ge=1, le=10)
 
 
 @lru_cache

@@ -24,6 +24,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.concurrency import run_in_threadpool
 
+from app.brain.models import DocumentIndexJob
 from app.documents.contracts import (
     DocumentIngestionStatusResponse,
     DocumentMetadataInput,
@@ -326,7 +327,10 @@ async def _own_duplicate(
 
 
 def version_response(
-    version: DocumentVersion, *, ingestion_status: str | None = None
+    version: DocumentVersion,
+    *,
+    ingestion_status: str | None = None,
+    indexing_status: str | None = None,
 ) -> DocumentVersionResponse:
     return DocumentVersionResponse(
         id=version.id,
@@ -337,6 +341,7 @@ def version_response(
         original_filename=version.original_filename,
         status=version.status,
         ingestion_status=ingestion_status,
+        indexing_status=indexing_status,
         created_at=version.created_at,
     )
 
@@ -696,7 +701,16 @@ async def read_document(context: DocumentContext, *, document_id: UUID) -> Docum
                 )
             )
         ).all()
+        index_jobs = (
+            await session.scalars(
+                select(DocumentIndexJob).where(
+                    DocumentIndexJob.document_id == document_id,
+                    DocumentIndexJob.tenant_id == user.tenant_id,
+                )
+            )
+        ).all()
     status_by_version = {job.document_version_id: job.state for job in jobs}
+    index_status_by_version = {job.document_version_id: job.state for job in index_jobs}
     return DocumentResponse(
         id=document.id,
         title=descriptor.title,
@@ -716,7 +730,11 @@ async def read_document(context: DocumentContext, *, document_id: UUID) -> Docum
             for grant in grants
         ],
         versions=[
-            version_response(version, ingestion_status=status_by_version.get(version.id))
+            version_response(
+                version,
+                ingestion_status=status_by_version.get(version.id),
+                indexing_status=index_status_by_version.get(version.id),
+            )
             for version in versions
         ],
     )

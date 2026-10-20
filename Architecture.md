@@ -1,6 +1,6 @@
 # KRIBU Demo Architecture
 
-**Status:** Iterations 0-6 are implemented and verified locally; Iteration 7 authorized retrieval is next
+**Status:** Iterations 0-7 are implemented and verified locally; Iteration 7 awaits owner review
 
 **Primary orchestration:** LangGraph
 
@@ -79,7 +79,7 @@ OPA receives a normalized, non-LLM input:
 
 Policy returns allow/deny, reason codes, obligations, and the policy version. SQL row-level security and application filters enforce the same tenant boundary as defense in depth.
 
-For a query such as "What is Mr Albert's salary?", Mike's role and department do not satisfy the `restricted_hr` policy. The request is denied before chunks are searched. Vector similarity is never used as authorization. An optional lightweight local classifier may detect sensitive intent and force denial or review, but cannot override a deterministic denial or create permission.
+For a query such as "What is Mr Albert's salary?", Mike's role and department do not satisfy the `restricted_hr` policy. The request is denied before chunks are searched. Vector similarity is never used as authorization. An optional lightweight classifier may detect sensitive intent and force denial or review, but cannot override a deterministic denial or create permission.
 
 ### Generic-industry adaptation
 
@@ -90,7 +90,7 @@ For a query such as "What is Mr Albert's salary?", Mike's role and department do
 
 ### Implemented Guard slice (Iterations 4-5)
 
-OPA `1.21.2` runs on a private Compose network shared only with the API; it has no host port. `OpaClient` sends typed canonical attributes to `data.kribu.authz.decision` and rejects missing/malformed results, timeouts, and unexpected policy versions. API readiness checks the loaded `guard-v2` policy version (bumped in step across `authz.rego`, settings, `.env.example` and Compose). The Rego policy recognizes `internal` and `restricted_hr`; every read needs a matching ACL grant, and `restricted_hr` also needs the `hr_manager` role. An administrator or auditor has no implicit content access. Each action is valid only for its declared purposes (`resource.read`: `demo_resource_read`, `document_read`; `document.create` and `document.version.create`: `document_upload`). Uploads are allowed for administrators on any mapped classification, HR managers on `restricted_hr`, and any user on `internal` documents of their own database department; a subject holding `auditor` never uploads. Upload permission never grants reading, and adding a version additionally requires read access to the existing document.
+OPA `1.21.2` runs on a private Compose network shared only with the API; it has no host port. `OpaClient` sends typed canonical attributes to `data.kribu.authz.decision` and rejects missing/malformed results, timeouts, and unexpected policy versions. API readiness checks the loaded `guard-v2` policy version (bumped in step across `authz.rego`, settings, `.env.example` and Compose). The Rego policy recognizes `internal` and `restricted_hr`; every read needs a matching ACL grant, and `restricted_hr` also needs the `hr_manager` role. An administrator or auditor has no implicit content access. Each action is valid only for its declared purposes (`resource.read`: `demo_resource_read`, `document_read`, `authorized_retrieval`; `document.create` and `document.version.create`: `document_upload`). Uploads are allowed for administrators on any mapped classification, HR managers on `restricted_hr`, and any user on `internal` documents of their own database department; a subject holding `auditor` never uploads. Upload permission never grants reading, and adding a version additionally requires read access to the existing document.
 
 Every protected operation calls `app/policy/authorization.py` `authorize()`: one OPA decision and one audit row carrying the caller's action, failing closed on policy or audit outage. The protected `GET /v1/demo/resources/{resource_id}` path uses three short tenant transactions (profile + descriptor + grants; the audit write; content on allow) and holds no connection while OPA answers. Inactive or unprovisioned identities are audited as `identity_not_provisioned` before the `403`. The profile's database department is used, not the token's potentially stale department. Unknown resource labels deny. Missing or inaccessible resources share a safe `404`; policy or audit failure gives `503` without releasing content. Even an absent resource makes a policy call, so a policy outage does not distinguish its existence through response status.
 
@@ -136,7 +136,7 @@ UploadGuard (ASGI)   no/invalid bearer -> 401 | body > 25 MiB (+64 KiB) -> 413
 
 A document is a Guard resource: its `resource_descriptors` row and grants are the ACL anchor and every version inherits it. `documents` holds BRN-06 metadata (`domain`, `project`, `document_date`) and the version counter; `document_versions` are append-only for the runtime role, which may update only `documents.latest_version_number` (a trigger allows only +1). Restrictive RLS policies bind new descriptors and grants to the acting subject, and stored upload responses are visible only to their sender. Duplicate detection never consults documents the caller did not create, so neither responses, timing, nor audit rows reveal hidden documents; a re-upload with a different classification, department, or grant set becomes a new document. Storage keys and paths never leave the API. Readiness probes the store. Published migrations remain immutable; `0004_upgrade_compatibility` upgrades Iteration 4 volumes, while `0005_document_provenance` and `0006_outbox_returning` add the compatible extraction schema and least-privilege outbox return path without a volume reset.
 
-Redis is a broker, not business storage: a dispatcher reads `document_ingestion_outbox` with the database owner, queues only a server-created job UUID, and records each publication attempt. The worker then resolves tenant, actor, document, and version from PostgreSQL, sets transaction-local RLS context, and claims the job. Each version is either `queued`/`processing`, atomically `ready` with one extraction and all blocks, or `quarantined`; partial normalized content is never visible. PDF uses native `docling-parse` in CPU-only/non-OCR mode with `pypdf` exact page text; DOCX, XLSX, CSV, TXT, and Markdown use deterministic structural parsers. Default safety limits are a single worker, 120 seconds per task, 250 PDF pages, and 100,000 extracted units. Malware scanning, OCR, semantic chunking, embeddings, vector retrieval, and blob garbage collection remain future work.
+Redis is a broker, not business storage: a dispatcher reads `document_ingestion_outbox` with the database owner, queues only a server-created job UUID, and records each publication attempt. The worker then resolves tenant, actor, document, and version from PostgreSQL, sets transaction-local RLS context, and claims the job. Each version is either `queued`/`processing`, atomically `ready` with one extraction and all blocks, or `quarantined`; partial normalized content is never visible. PDF uses native `docling-parse` in CPU-only/non-OCR mode with `pypdf` exact page text; DOCX, XLSX, CSV, TXT, and Markdown use deterministic structural parsers. Default safety limits are a single worker, 120 seconds per task, 250 PDF pages, and 100,000 extracted units. Malware scanning, OCR, and blob garbage collection remain future work.
 
 `GET /v1/documents/{document_id}/versions/{version_id}/preview` checks Guard before exposing blocks and returns `202` while parsing, `409` when quarantined, or `404` when inaccessible. `GET .../download` applies the same Guard check before reading original bytes.
 
@@ -144,12 +144,16 @@ Original files are immutable. A `DocumentVersion` owns normalized blocks; each `
 
 ### Retrieval
 
-1. Compile tenant and ACL constraints into SQL.
-2. Retrieve lexical and semantic candidates inside the allowed set.
-3. Merge ranks using reciprocal-rank fusion.
-4. Optionally rerank locally after authorization.
-5. Enforce diversity and evidence coverage.
-6. Return `EvidenceRef` objects, not untracked strings.
+1. Load only current-tenant documents whose latest version has a complete active index generation.
+2. Resolve current resource metadata and grants, then ask OPA for `resource.read` with purpose `authorized_retrieval`.
+3. Embed the query only when at least one document is allowed; provider failure returns `503` rather than lexical-only results.
+4. Run PostgreSQL English full-text and pgvector cosine candidates with tenant, allowed IDs, latest version, active generation, and client narrowing filters inside both SQL branches.
+5. Fuse the top 50 from each branch with equal-weight RRF (`k=60`), cap one document at three chunks, and return 1-20 evidence items (default 8).
+6. Return immutable version IDs, exact source locators, and `untrusted_source: true`; Iteration 8 must treat text as evidence, never instructions.
+
+Migration `0007_authorized_hybrid_retrieval` adds forced-RLS index jobs/outbox records, immutable generations, `vector(768)` search chunks, atomic active heads, and append-only retrieval audits. Parsing publishes an index job in its successful transaction, and the existing one-slot Celery worker receives only the trusted job UUID. Chunking targets about 400 words, hard-caps at 600, overlaps by at most 60, preserves headings and structural records, and records character offsets when one source block must split. A chunker/model change creates a new generation; the active pointer moves only after every embedding succeeds, so embedding spaces never mix.
+
+`gemini-embedding-2` produces normalized 768-dimensional document and query embeddings behind `EmbeddingProvider`. It receives only synthetic demo text. PostgreSQL remains authoritative if Redis loses messages; transient provider errors return the job to the outbox with bounded backoff. Index failure never quarantines the parsed original. ACLs are evaluated live rather than embedded, so revocation applies immediately without reindexing. Retrieval audit rows record safe filters, evidence IDs, versions, duration, and model/policy contracts, but never raw query text, tokens, or document content.
 
 ## 6. KRIBU Engine
 
@@ -199,7 +203,7 @@ All demo services are self-hosted and usable without a paid account.
 | Workflow | LangGraph OSS | Durable graphs, checkpoints, streaming, interrupts |
 | Model inference | Google AI Studio Gemini free tier behind `ModelProvider` | Demo default; synthetic data only; model and provider remain configurable |
 | Fallback inference | Ollama adapter (optional) | Not required for the demo; useful for offline/private deployments later |
-| Embeddings/reranking | Sentence Transformers with BGE-family open models | Local, configurable, multilingual-capable |
+| Embeddings | Gemini Embedding 2 (`gemini-embedding-2`, 768 dimensions) behind `EmbeddingProvider` | Synthetic demo data only; provider/model/chunker contract is versioned |
 | Parsing | `docling-parse` + `pypdf`, python-docx, openpyxl, deterministic CSV/TXT/Markdown | CPU-only, no OCR; exact source locators |
 | Database/search | PostgreSQL + pgvector | Relational data, full-text search, vectors, RLS |
 | Object storage | Local filesystem adapter for demo | S3-compatible adapter added when deployment requires it |

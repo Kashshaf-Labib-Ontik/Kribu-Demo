@@ -4,8 +4,8 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Current status
 
-- **Lifecycle:** Iterations 0-6 are implemented and verified locally. Iteration 6 adds durable parsing, provenance, quarantine, and authorized preview/download without replacing the Iteration 5 document boundary.
-- **Active area:** Iteration 7 authorized hybrid retrieval planning.
+- **Lifecycle:** Iterations 0-7 are implemented and verified locally. Iteration 7 adds authorization-first hybrid retrieval over immutable Iteration 6 provenance.
+- **Active area:** Iteration 7 owner review; changes remain uncommitted.
 - **Application code:** Keycloak identity, RLS, OPA RBAC/ABAC, protected synthetic resource access, and append-only authorization audit are committed.
 - **Selected stories:** NGO Project, HR Employee History, Client Complaint Patterns.
 - **Data:** Built-in synthetic identities, Guard resources, and upload fixtures are available; no client data sources are connected.
@@ -28,7 +28,8 @@ This is the current implementation handoff. Update it in every material implemen
 - Hardening Group 2 (`a260fe2`): `AppError` + RFC 9457 `application/problem+json` for every error (422 never echoes input); pure ASGI request context (validated `X-Correlation-ID`, server `X-Request-ID`, logged 500 problem, CORS wraps it); correlated stdlib logging; required `database_url` (`SecretStr`) and a startup guard refusing superuser/BYPASSRLS/table-owner roles; JWKS outage returns 503 `identity_provider_unavailable`; one `tenant_transaction()`; audit rows carry `request_id`; fixed CORS origins (pydantic's trailing `/` never matched a browser `Origin`).
 - Hardening Group 3 (`387bc81`): reusable `app/policy/authorization.py` `authorize()` (one OPA decision, one audit row with the caller's action, fails closed; missing resources deny as `resource_unavailable`); the protected read uses three short tenant transactions and holds no connection during the OPA call; inactive or unprovisioned identities are audited (`identity_not_provisioned`) before the 403. Rego `guard-v1` allowed only `resource.read`.
 - Iteration 5: `app/documents/` (models, contracts, errors, stdlib type validation, `LocalFileObjectStore`, ASGI `UploadGuardMiddleware`, service), routes `POST /v1/documents/uploads`, `POST /v1/documents/{id}/versions`, `GET /v1/documents/{id}`, migrations `0003_documents` and `0004_upgrade_compatibility`, Rego `guard-v2` upload rules, Compose `kribu_document_store` volume, readiness store probe, `python-multipart`, and live document verification. Adding a version requires read access as well as the upload rule; own-document duplicates must also match classification, department and grant set; restrictive RLS binds new descriptors/grants to the acting subject; upload replays are private to their sender; the version counter can only advance by one; corrupt OOXML, XLM macro sheets and control characters are rejected. Short temporary object-store names keep atomic writes within Windows path limits.
-- Iteration 6 (uncommitted; owner review pending): `app/ingestion/` adds a Celery dispatcher and parser worker. Redis `7.4.2` is broker-only, AOF-backed, `noeviction`, memory-capped, and paired with one worker (`--concurrency=1`). Each upload/version transaction now creates an RLS-protected ingestion job and Postgres outbox row. The worker receives only a job UUID, resolves trusted context from PostgreSQL, and atomically publishes one extraction plus all normalized blocks or quarantines the version. `0005_document_provenance` and `0006_outbox_returning` are forward-only migration compatibility additions. `app/documents/parsing.py` supports CPU-only PDF (`docling-parse` + page locators), DOCX, XLSX, CSV, TXT, and Markdown; defaults are 120 seconds, 250 PDF pages, and 100,000 units. Preview/download are Guard-protected; preview is `202` while pending, `409` when quarantined, and `404` when unavailable/inaccessible.
+- Iteration 6: `app/ingestion/` adds a Celery dispatcher and parser worker. Redis `7.4.2` is broker-only, AOF-backed, `noeviction`, memory-capped, and paired with one worker (`--concurrency=1`). Each upload/version transaction creates an RLS-protected ingestion job and Postgres outbox row. The worker receives only a job UUID, resolves trusted context from PostgreSQL, and atomically publishes one extraction plus all normalized blocks or quarantines the version. `0005_document_provenance` and `0006_outbox_returning` are forward-only migration compatibility additions. `app/documents/parsing.py` supports CPU-only PDF (`docling-parse` + page locators), DOCX, XLSX, CSV, TXT, and Markdown; defaults are 120 seconds, 250 PDF pages, and 100,000 units. Preview/download are Guard-protected; preview is `202` while pending, `409` when quarantined, and `404` when unavailable/inaccessible.
+- Iteration 7 (uncommitted; owner review pending): `app/brain/` adds deterministic structure-aware chunking, `EmbeddingProvider`, durable index jobs/outbox delivery, immutable generations, active heads, authorization-first hybrid retrieval, RRF/diversity, exact evidence contracts, and append-only retrieval audits. Migration `0007_authorized_hybrid_retrieval` adds forced-RLS FTS and pgvector storage without rewriting history. `POST /v1/retrieval/search` evaluates current OPA ACLs before query embedding and restricts both ranking branches to allowed latest-version active indexes. The synthetic-only model contract is Gemini `gemini-embedding-2`, 768 unit-normalized dimensions, `question-answering-v1`, and `structure-v1`.
 
 ## Current decisions
 
@@ -37,13 +38,13 @@ This is the current implementation handoff. Update it in every material implemen
 - LangGraph OSS with PostgreSQL checkpoints owns reasoning workflow state.
 - Pydantic owns typed contracts; deterministic code owns policy, math, validation, and side effects.
 - Authorization uses RBAC + ABAC + document ACLs + RLS. Vector search and LLM reasoning do not grant access.
-- Brain uses provenance-aware CPU-only parsing now; authorized hybrid PostgreSQL retrieval is Iteration 7.
+- Brain uses provenance-aware CPU-only parsing plus PostgreSQL FTS/pgvector hybrid retrieval. Gemini Embedding 2 is the synthetic-demo embedding provider; generation metadata keeps it replaceable.
 - Gemini free-tier inference through the official Google SDK is the demo default. It is backend-only, configurable, quota-aware, and restricted to synthetic data.
 - `ModelProvider` remains the boundary; Ollama is optional future fallback for offline/private deployments.
 - Local filesystem is the demo object store behind an adapter; hosted object storage is deferred.
 - All proposed external actions remain drafts behind human approval during the demo.
 - Testing stays focused on security, retrieval, citations, graph behavior, API integration, goldens, and four browser journeys.
-- Implementation commits and pushes require explicit owner approval; Iteration 6 remains uncommitted pending review.
+- Implementation commits and pushes require explicit owner approval; Iteration 7 remains uncommitted pending review.
 
 ## Superseded source decisions
 
@@ -53,9 +54,9 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Current file/area being worked on
 
-- `services/api/app/documents` and `app/ingestion`: Iteration 6 parsing/provenance is complete locally; next work builds authorized retrieval over ready blocks.
-- `services/api/migrations`: published history is preserved; existing volumes upgrade forward through `0006_outbox_returning`.
-- `policies/`: `guard-v2` protects reads, document creation, and version creation.
+- `services/api/app/brain`: Iteration 7 indexing, embedding, retrieval, and evidence contracts are complete locally pending review.
+- `services/api/migrations`: published history is preserved; existing volumes upgrade forward through `0007_authorized_hybrid_retrieval`.
+- `policies/`: `guard-v2` protects reads, document creation, version creation, and the `authorized_retrieval` purpose.
 
 ## Verification performed
 
@@ -84,6 +85,9 @@ This is the current implementation handoff. Update it in every material implemen
 - Final Iteration 5 gate: 144 unit tests pass (69 integration-marked tests skipped in the unit command), all 68 PostgreSQL/OPA integration tests pass, and all 35 Rego tests pass. Ruff lint/format, mypy, ESLint, TypeScript, frozen lock, Compose validation, and the production web build pass.
 - Live identity/RLS, Guard, document lifecycle, and Gemini verifiers pass. Document verification proves anonymous denial, Helen upload/read, Mike and second-tenant denial, create/version idempotency, same-as-latest handling, and exactly versions 1-2. All long-running Compose services are healthy.
 - Iteration 6 focused parser tests pass for PDF, DOCX, XLSX, CSV, TXT/Markdown exact locators, malformed OOXML, and extraction limits. The live parsing verifier passed a unique synthetic upload, idempotent replay, versioning, Redis/outbox dispatch, normalized four-block preview, original-byte download, and cross-tenant `404`. The three-story loader then uploaded and preview-verified all seven NGO, HR, and client-servicing source files through the single worker. Existing Docker volumes upgraded from `0004` through `0006` without deletion; API, Redis, and the one-slot worker are healthy.
+- Final Iteration 7 gates pass: 157 non-integration tests, all 91 PostgreSQL/OPA integration tests, all 36 Rego tests, Ruff lint/format, mypy, ESLint, TypeScript, frozen lock, Compose validation, diff checks, and the production web build. Integration coverage includes fresh and `0004 -> head` migrations, RLS/grants, authorization before ranking, exact provenance, narrowing filters, no stale-version fallback, provider `503`, duplicate index publication, and rejection of caller-supplied authorization fields.
+- The existing volume upgraded through `0007`; after the uncommitted embedding contract was finalized, only recoverable derived index/audit tables were rebuilt from preserved extractions. The worker completed 13 index jobs with 13 active generations; all stored vector norms are 1.0 and all generations use `question-answering-v1`. Live retrieval returned three NGO and two HR evidence items with zero Mike-salary or cross-tenant leakage. The 12-positive/6-negative golden set achieved Recall@5 1.0, MRR 0.875, and zero authorization violations.
+- The standalone Gemini generation verifier received a safe retryable provider `503` on three final reruns; its earlier live verification passed, and all Iteration 7 live Gemini embedding/index/query calls returned successfully.
 
 ## Known open questions
 
@@ -93,7 +97,7 @@ This is the current implementation handoff. Update it in every material implemen
 
 ## Next step
 
-Begin Iteration 7: authorized hybrid retrieval over `ready` normalized blocks. Apply tenant/RLS and Guard predicates before full-text/vector candidates are ranked; add embeddings and semantic chunking only after the access boundary is proven. OCR, malware scanning, and blob garbage collection remain deferred. The integration suite uses the dedicated `kribu_test` database and a temporary localhost-only OPA container.
+After owner review, commit Iteration 7 as `Implement authorized hybrid retrieval`. Then begin Iteration 8: typed LangGraph state, PostgreSQL checkpoints, bounded retrieve-analyze-verify execution, SSE progress, and Gemini answer generation grounded only in the new untrusted evidence contract. OCR, malware scanning, and blob garbage collection remain deferred.
 
 ## Update template
 

@@ -133,6 +133,18 @@ test_document_read_purpose_allowed if {
     })
 }
 
+test_authorized_retrieval_purpose_uses_the_same_read_grant if {
+    resource := object.union(base_input.resource, {
+        "classification": "internal",
+        "department": "engineering",
+        "grants": [{"principal_type": "department", "principal_id": "engineering", "action": "resource.read"}],
+    })
+    authz.decision.allow with input as object.union(base_input, {
+        "resource": resource,
+        "environment": {"purpose": "authorized_retrieval"},
+    })
+}
+
 test_read_with_upload_purpose_denied if {
     subject := object.union(base_input.subject, {"roles": ["hr_manager"]})
     not authz.decision.allow with input as object.union(base_input, {

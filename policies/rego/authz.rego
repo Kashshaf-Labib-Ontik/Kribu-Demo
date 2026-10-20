@@ -16,7 +16,7 @@ reason_code := "allowed" if allow
 
 # Each action is only valid for its own declared purposes.
 action_purposes := {
-    "resource.read": {"demo_resource_read", "document_read"},
+    "resource.read": {"demo_resource_read", "document_read", "authorized_retrieval"},
     "document.create": {"document_upload"},
     "document.version.create": {"document_upload"},
 }

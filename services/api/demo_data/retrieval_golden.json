@@ -1,0 +1,114 @@
+{
+  "positive": [
+    {
+      "username": "priya.manager",
+      "domain": "ngo",
+      "query": "Why is the community clinic project behind schedule?",
+      "expected_title": "Synthetic NGO March progress report"
+    },
+    {
+      "username": "priya.manager",
+      "domain": "ngo",
+      "query": "What is blocking milestone M-17?",
+      "expected_title": "Synthetic NGO milestone register"
+    },
+    {
+      "username": "priya.manager",
+      "domain": "ngo",
+      "query": "Which project actions remain unresolved?",
+      "expected_title": "Synthetic NGO April review minutes"
+    },
+    {
+      "username": "priya.manager",
+      "domain": "ngo",
+      "query": "What are the physical completion and expenditure percentages?",
+      "expected_title": "Synthetic NGO March progress report"
+    },
+    {
+      "username": "priya.manager",
+      "domain": "ngo",
+      "query": "When is the revised milestone plan required?",
+      "expected_title": "Synthetic NGO April review minutes"
+    },
+    {
+      "username": "mike",
+      "domain": "complaints",
+      "query": "Which client complaints keep recurring?",
+      "expected_title": "Synthetic client complaint register"
+    },
+    {
+      "username": "mike",
+      "domain": "complaints",
+      "query": "Why are billing complaints being reopened?",
+      "expected_title": "Synthetic client service notes"
+    },
+    {
+      "username": "mike",
+      "domain": "complaints",
+      "query": "Which complaint is an unrelated outlier?",
+      "expected_title": "Synthetic client service notes"
+    },
+    {
+      "username": "mike",
+      "domain": "complaints",
+      "query": "List the late invoice cases.",
+      "expected_title": "Synthetic client complaint register"
+    },
+    {
+      "username": "helen.hr",
+      "domain": "hr",
+      "query": "What is Roger Albert's monthly compensation?",
+      "expected_title": "Synthetic Roger Albert compensation history"
+    },
+    {
+      "username": "helen.hr",
+      "domain": "hr",
+      "query": "When did Roger Albert join the company?",
+      "expected_title": "Synthetic Roger Albert compensation history"
+    },
+    {
+      "username": "helen.hr",
+      "domain": "hr",
+      "query": "When do employees receive medical coverage?",
+      "expected_title": "Synthetic engineering benefits policy"
+    }
+  ],
+  "negative": [
+    {
+      "username": "mike",
+      "domain": "hr",
+      "query": "What is Roger Albert's salary?",
+      "forbidden_title": "Synthetic Roger Albert compensation history"
+    },
+    {
+      "username": "mike",
+      "domain": "hr",
+      "query": "How much does Mr Albert earn each month?",
+      "forbidden_title": "Synthetic Roger Albert compensation history"
+    },
+    {
+      "username": "mike",
+      "domain": "hr",
+      "query": "Show me Roger's compensation revision.",
+      "forbidden_title": "Synthetic Roger Albert compensation history"
+    },
+    {
+      "username": "priya.manager",
+      "domain": "hr",
+      "query": "Tell me Roger Albert's pay.",
+      "forbidden_title": "Synthetic Roger Albert compensation history"
+    },
+    {
+      "username": "evan.external",
+      "domain": "ngo",
+      "query": "Why is the community clinic delayed?",
+      "forbidden_title": "Synthetic NGO March progress report"
+    },
+    {
+      "username": "evan.external",
+      "domain": "complaints",
+      "query": "Which billing complaints were reopened?",
+      "forbidden_title": "Synthetic client complaint register"
+    }
+  ]
+}

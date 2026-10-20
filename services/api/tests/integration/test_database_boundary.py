@@ -26,6 +26,12 @@ TENANT_TABLES = (
     "document_ingestion_outbox",
     "document_extractions",
     "document_content_blocks",
+    "document_index_jobs",
+    "document_index_outbox",
+    "document_index_generations",
+    "document_search_chunks",
+    "document_index_heads",
+    "retrieval_audit_events",
 )
 
 
@@ -83,15 +89,17 @@ def test_derived_ingestion_tables_force_row_level_security(owner_db: object) -> 
             "document_extractions",
             "document_ingestion_jobs",
             "document_ingestion_outbox",
+            "document_index_generations",
+            "document_index_heads",
+            "document_index_jobs",
+            "document_index_outbox",
+            "document_search_chunks",
+            "retrieval_audit_events",
         ],
     )
 
-    assert [(row["relrowsecurity"], row["relforcerowsecurity"]) for row in rows] == [
-        (True, True),
-        (True, True),
-        (True, True),
-        (True, True),
-    ]
+    assert len(rows) == 10
+    assert all(row["relrowsecurity"] and row["relforcerowsecurity"] for row in rows)
 
 
 @pytest.mark.asyncio
@@ -146,6 +154,10 @@ async def test_cross_tenant_audit_insert_is_blocked(app_connection: asyncpg.Conn
         "DELETE FROM resource_acl_grants WHERE false",
         "UPDATE user_profiles SET is_active = true WHERE false",
         "UPDATE demo_resource_content SET content = 'x' WHERE false",
+        "UPDATE retrieval_audit_events SET result_count = 0 WHERE false",
+        "DELETE FROM retrieval_audit_events WHERE false",
+        "UPDATE document_search_chunks SET text = 'tampered' WHERE false",
+        "DELETE FROM document_search_chunks WHERE false",
     ],
 )
 async def test_runtime_role_cannot_modify_authorization_data(

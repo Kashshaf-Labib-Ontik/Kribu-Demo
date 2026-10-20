@@ -72,6 +72,7 @@ class DocumentVersionResponse(BaseModel):
     original_filename: str
     status: str
     ingestion_status: str | None = None
+    indexing_status: str | None = None
     created_at: datetime
 
 

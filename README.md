@@ -99,6 +99,20 @@ Set-Location ../..
 
 The repeatable source packs for NGO, HR, and client servicing are under `services/api/demo_data/`. Run `services/api/scripts/load_demo_documents.py --confirm-synthetic` after Compose is healthy; it uploads each source with its ACL and waits for a non-empty authorized preview.
 
+Iteration 7 indexes every successfully parsed version with deterministic structure-aware chunks, exact source references, PostgreSQL full-text search, and 768-dimensional `gemini-embedding-2` vectors. PostgreSQL index jobs/outbox rows make Celery delivery retryable; a complete generation becomes searchable atomically. Search evaluates the current document ACLs through Guard first, then runs both ranking branches inside the allowed document set. Only the latest version is eligible, and a latest version whose index is not ready never falls back to stale evidence.
+
+Load the synthetic packs, verify the live retrieval boundary, and evaluate the 12 positive plus 6 authorization-negative golden queries:
+
+```powershell
+Set-Location services/api
+uv run python -m scripts.load_demo_documents --confirm-synthetic
+uv run python -m scripts.verify_retrieval --confirm-synthetic
+uv run python -m scripts.evaluate_retrieval --confirm-synthetic
+Set-Location ../..
+```
+
+The protected API is `POST /v1/retrieval/search`. It returns ranked, citation-ready evidence marked as untrusted source material; it does not generate an answer. ACL revocation takes effect without re-embedding. Gemini embedding failure, OPA failure, or required audit failure returns `503`; an authorized search with no evidence returns an empty `200` response. Gemini free-tier embedding remains synthetic-only because unpaid inputs may be used by Google to improve its products.
+
 For faster application development, run PostgreSQL in Docker and the applications on the host:
 
 ```powershell
@@ -128,4 +142,4 @@ Overrides: `KRIBU_TEST_OWNER_DATABASE_URL` (default `postgresql://kribu:kribu_de
 
 ## Current status
 
-Iterations 0-6 are implemented and verified locally. Iteration 6 adds durable parse jobs/outbox recovery, Redis + a single Celery worker, normalized provenance blocks, quarantine, and authorized preview/download. OCR, malware scanning, semantic chunking, embeddings, vector search, and retrieval remain intentionally deferred to Iteration 7.
+Iterations 0-7 are implemented and verified locally; Iteration 7 remains uncommitted pending owner review. KRIBU Brain now provides authorization-first hybrid retrieval with durable indexing, exact provenance, live ACL evaluation, PostgreSQL FTS/pgvector ranking, RRF, diversity limits, safe retrieval audits, and a measured synthetic golden set. Gemini answer generation and LangGraph orchestration begin in Iteration 8. OCR, malware scanning, and blob garbage collection remain deferred.

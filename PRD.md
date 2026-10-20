@@ -1,6 +1,6 @@
 # KRIBU Demo Product Requirements
 
-**Status:** Iterations 0-6 are implemented and verified locally; Iteration 7 authorized retrieval is next
+**Status:** Iterations 0-7 are implemented and verified locally; Iteration 7 awaits owner review
 
 **Scope:** Local, synthetic-data demo
 
@@ -92,11 +92,13 @@ The demo proves these capabilities with synthetic files because live client data
 - **BRN-02:** Validate file type and size, hash content, detect duplicates, and quarantine failed files.
 - **BRN-03:** Preserve immutable originals and create versioned normalized representations.
 - **BRN-04:** Extract normalized blocks with exact PDF page, DOCX paragraph/table/row/column, XLSX sheet/A1, CSV row/column, and text/Markdown line/heading locators using deterministic parsers.
-- **BRN-05:** Chunk without losing document version or page/cell provenance.
+- **BRN-05:** Deterministically chunk ready normalized blocks without losing document version, original block IDs, exact locators, heading path, or split character offsets.
 - **BRN-06:** Attach tenant, domain, sensitivity, owner, department, project, date, and ACL metadata before indexing.
-- **BRN-07:** Provide authorized hybrid search using PostgreSQL full-text search and pgvector, fused and optionally reranked.
+- **BRN-07:** Provide authorization-first hybrid search using PostgreSQL full-text search and pgvector, equal-weight reciprocal-rank fusion, and per-document diversity limits.
 - **BRN-08:** Store facts, entities, relationships, embeddings, and conversational/run state separately from source documents.
-- **BRN-09:** Re-index safely when a parser, embedding model, or ACL changes. For the demo, a durable Postgres outbox safely republishes queued parsing work after Redis/worker interruption.
+- **BRN-09:** Re-index safely when a parser, chunker, or embedding model changes by building a complete immutable generation before atomically changing the active head. ACL changes apply live without re-embedding.
+- **BRN-10:** Use PostgreSQL outboxes as authoritative recovery for both parsing and indexing; Redis carries only opaque job IDs and duplicate delivery is idempotent.
+- **BRN-11:** Return ranked evidence with immutable version IDs and exact source locators, mark all retrieved text as untrusted, and audit safe filters/evidence IDs without storing raw query text or content.
 
 ### Engine and skills
 
@@ -128,6 +130,7 @@ The demo proves these capabilities with synthetic files because live client data
 - **Performance target:** first progress event within 2 seconds; simple retrieval response within 15 seconds and multi-document analysis within 90 seconds on the reference machine. External-model latency and quota delays are reported, not hidden.
 - **Accessibility:** keyboard access, visible focus, semantic markup, and WCAG 2.2 AA color contrast.
 - **Privacy:** only synthetic demo content may be sent to Gemini; hosted telemetry remains disabled by default.
+- **Retrieval quality:** the synthetic golden set must achieve Recall@5 of at least 90%, mean reciprocal rank of at least 0.75, and zero unauthorized evidence.
 - **Portability:** provider interfaces isolate model, embedding, object storage, identity, policy, and connector implementations.
 - **Auditability:** each run records prompt/skill version, model, retrieved evidence, policy decisions, tool calls, approvals, timings, and output.
 

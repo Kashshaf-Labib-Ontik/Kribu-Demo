@@ -75,12 +75,14 @@ The commit messages below are targets and may be adjusted to match the actual sl
 - Quarantine malformed, encrypted, archive-expansion-risk, oversized, timeout-exceeded, or limit-exceeded sources. Enforce configurable defaults: 120 seconds, 250 PDF pages, 100,000 content units.
 - Protect preview and download through the existing Guard; `202` means parsing, `409` means quarantined, and inaccessible versions remain `404`.
 - **Commit:** `Preserve document extraction provenance`
-- **Commit:** `Preserve document extraction provenance`
 
 ### Iteration 7 - Authorized hybrid retrieval
 
-- Generate local embeddings, add PostgreSQL full-text/vector indexes, RRF, and evidence contracts.
-- Apply tenant/ACL predicates before candidates reach ranking or models.
+- Generate 768-dimensional `gemini-embedding-2` vectors for synthetic content only; keep PostgreSQL FTS and pgvector as the single hybrid index.
+- Add durable index jobs/outbox delivery, deterministic structure-aware chunks, immutable index generations, and atomic active heads.
+- Evaluate current ACLs through Guard before query embedding or ranking; enforce tenant, allowed document IDs, latest version, active generation, and narrowing filters inside both SQL branches.
+- Fuse top-50 lexical/vector candidates with RRF (`k=60`), cap evidence per document, preserve exact locators, and store append-only retrieval audits without raw queries/content.
+- Verify 12 positive and 6 authorization-negative golden queries at Recall@5 >= 90%, MRR >= 0.75, and zero leakage.
 - **Commit:** `Implement authorized hybrid retrieval`
 
 ### Iteration 8 - LangGraph runtime
@@ -170,4 +172,4 @@ Use a small working exercise for each topic rather than completing long courses 
 
 ## 8. Current delivery gate
 
-Iterations 0-6 are implemented and verified locally. Iteration 6 adds RLS-protected job, outbox, extraction, and block tables; migration `0005_document_provenance` plus forward-only `0006_outbox_returning`; Redis + one Celery worker; exact source locators; quarantine; and authorized preview/download. Iteration 7 authorized hybrid retrieval is next. Implementation commits and pushes still require explicit owner approval.
+Iterations 0-7 are implemented and verified locally. Iteration 7 adds forward-only migration `0007_authorized_hybrid_retrieval`, durable indexing, Gemini Embedding 2 with a synthetic-only boundary, PostgreSQL FTS/pgvector search, authorization-first candidate filtering, RRF, exact evidence contracts, and safe retrieval audits. Its 18-query live golden evaluation achieved Recall@5 1.0, MRR 0.875, and zero authorization violations. Iteration 8 LangGraph execution is next. Iteration 7 is uncommitted; commits and pushes still require explicit owner approval.

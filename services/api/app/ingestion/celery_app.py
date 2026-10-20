@@ -10,7 +10,7 @@ settings = get_settings()
 celery_app = Celery(
     "kribu_ingestion",
     broker=settings.celery_broker_url.get_secret_value(),
-    include=["app.ingestion.tasks"],
+    include=["app.ingestion.tasks", "app.brain.tasks"],
 )
 celery_app.conf.update(
     task_serializer="json",
@@ -25,6 +25,10 @@ celery_app.conf.update(
         "dispatch-document-ingestion-outbox": {
             "task": "app.ingestion.tasks.dispatch_ingestion_outbox",
             "schedule": settings.ingestion_poll_seconds,
-        }
+        },
+        "dispatch-document-index-outbox": {
+            "task": "app.brain.tasks.dispatch_index_outbox",
+            "schedule": settings.ingestion_poll_seconds,
+        },
     },
 )

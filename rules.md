@@ -46,6 +46,7 @@ These rules apply to implementation, review, and generated code. Security and da
 - Use bounded retries and bounded graph loops. On exhaustion, return a partial qualified result.
 - Keep prompts and skills versioned. Record model, parameters, prompt/skill version, and retrieved evidence per run.
 - Use Gemini free-tier inference only for synthetic demo data. Never send real client, salary, HR, complaint, or confidential organizational data to it.
+- This boundary also applies to `gemini-embedding-2`; embedding calls are external model processing, not local database operations.
 - Keep the Gemini API key server-side and outside Git; never expose it in browser variables, logs, traces, prompts, screenshots, or errors.
 - Put Gemini behind `ModelProvider`; enforce timeouts, bounded exponential backoff for 429/5xx responses, token limits, and provider-specific error mapping.
 - Never fine-tune on client data during the demo and never silently fall back from an approved private provider to a free external provider.
@@ -56,8 +57,12 @@ These rules apply to implementation, review, and generated code. Security and da
 - Preserve document ID, immutable version ID, content hash, and exact locator throughout parsing and chunking.
 - Prefer deterministic Office/spreadsheet parsers where page/cell accuracy matters; use OCR only when needed.
 - Store the embedding model ID and chunking version so indexes can be rebuilt.
+- Publish a new immutable index generation and switch its active head only after every chunk and vector validates; never mix dimensions, models, or chunker versions.
 - Keep authorization predicates in the same query or transaction that selects candidates.
 - Combine lexical and semantic retrieval; measure on golden queries before tuning weights.
+- Do not degrade to lexical-only search when the approved query-embedding provider fails; fail closed with a safe `503` so result semantics stay explicit.
+- Evaluate current ACLs before embedding/ranking and never encode permission into vectors; authorization revocation must work without reindexing.
+- Never store raw queries, bearer tokens, or document text in retrieval audit rows.
 - Do not cache results across users unless the authorization scope is part of the cache key.
 - Recheck access when opening evidence or downloading an artifact, even if a prior run was authorized.
 
