@@ -1,6 +1,6 @@
 # KRIBU Demo Architecture
 
-**Status:** Iterations 0-5 are implemented and verified; Iteration 6 parsing and provenance is next
+**Status:** Iterations 0-6 are implemented and verified locally; Iteration 7 authorized retrieval is next
 
 **Primary orchestration:** LangGraph
 
@@ -102,19 +102,22 @@ Every protected operation calls `app/policy/authorization.py` `authorize()`: one
 
 ```mermaid
 flowchart LR
-    UP[Upload / future connector] --> Q[Quarantine and validate]
-    Q --> H[Hash and version]
-    H --> P[Docling / deterministic parser]
-    P --> N[Normalize structure]
-    N --> ACL[Map metadata and ACL]
-    ACL --> C[Provenance-aware chunks]
+    UP[Upload / future connector] --> Q[Validate, hash, version]
+    Q --> O[Postgres job + outbox\natomic with version]
+    O --> R[Redis message\nopaque job ID only]
+    R --> W[Celery worker\nconcurrency 1]
+    W --> P[CPU-only parser]
+    P --> N[Normalize blocks + exact locators]
+    N --> C[One transaction: extraction + blocks + ready]
+    W -->|safe failure| X[Quarantine version]
+    C --> ACL[Existing Guard + ACL]
     C --> I[Full-text + vector index]
     N --> F[Facts and entities]
     I --> R[Authorized hybrid retrieval]
     F --> R
 ```
 
-### Implemented upload lifecycle (Iteration 5)
+### Implemented ingestion and provenance lifecycle (Iterations 5-6)
 
 ```text
 UploadGuard (ASGI)   no/invalid bearer -> 401 | body > 25 MiB (+64 KiB) -> 413
@@ -124,11 +127,18 @@ UploadGuard (ASGI)   no/invalid bearer -> 401 | body > 25 MiB (+64 KiB) -> 413
   -> authorize(document.create | document.version.create)  (audited)
   -> create: duplicate only among the caller's own documents with the same access -> 200 duplicate_of
   -> LocalFileObjectStore.put  tenants/{tenant}/sha256/{hh}/{hex}  (fsync + replace)
-  -> one transaction: descriptor + grants + document + version + upload_request
+  -> one transaction: descriptor + grants + document + version + upload_request + parse job + outbox
      version: UPDATE latest_version_number (row lock); same bytes as latest -> 200
+  -> dispatcher republishes queued/expired outbox rows to Redis; duplicate messages claim no work
+  -> one Celery worker resolves tenant/actor only from the persisted job, parses, then atomically
+     publishes extraction metadata + normalized blocks + ready state, or quarantines safely
 ```
 
-A document is a Guard resource: its `resource_descriptors` row and grants are the ACL anchor and every version inherits it. `documents` holds BRN-06 metadata (`domain`, `project`, `document_date`) and the version counter; `document_versions` are append-only for the runtime role, which may update only `documents.latest_version_number` (a trigger allows only +1). Restrictive RLS policies bind new descriptors and grants to the acting subject, and stored upload responses are visible only to their sender. Duplicate detection never consults documents the caller did not create, so neither responses, timing, nor audit rows reveal hidden documents; a re-upload with a different classification, department, or grant set becomes a new document. Storage keys and paths never leave the API. Readiness probes the store. Published migrations remain immutable; `0004_upgrade_compatibility` upgrades existing Iteration 4 databases, tightens runtime grants, and adds tenant-safe version references without a volume reset. Parsing, quarantine, preview and downloads arrive with Iteration 6.
+A document is a Guard resource: its `resource_descriptors` row and grants are the ACL anchor and every version inherits it. `documents` holds BRN-06 metadata (`domain`, `project`, `document_date`) and the version counter; `document_versions` are append-only for the runtime role, which may update only `documents.latest_version_number` (a trigger allows only +1). Restrictive RLS policies bind new descriptors and grants to the acting subject, and stored upload responses are visible only to their sender. Duplicate detection never consults documents the caller did not create, so neither responses, timing, nor audit rows reveal hidden documents; a re-upload with a different classification, department, or grant set becomes a new document. Storage keys and paths never leave the API. Readiness probes the store. Published migrations remain immutable; `0004_upgrade_compatibility` upgrades Iteration 4 volumes, while `0005_document_provenance` and `0006_outbox_returning` add the compatible extraction schema and least-privilege outbox return path without a volume reset.
+
+Redis is a broker, not business storage: a dispatcher reads `document_ingestion_outbox` with the database owner, queues only a server-created job UUID, and records each publication attempt. The worker then resolves tenant, actor, document, and version from PostgreSQL, sets transaction-local RLS context, and claims the job. Each version is either `queued`/`processing`, atomically `ready` with one extraction and all blocks, or `quarantined`; partial normalized content is never visible. PDF uses native `docling-parse` in CPU-only/non-OCR mode with `pypdf` exact page text; DOCX, XLSX, CSV, TXT, and Markdown use deterministic structural parsers. Default safety limits are a single worker, 120 seconds per task, 250 PDF pages, and 100,000 extracted units. Malware scanning, OCR, semantic chunking, embeddings, vector retrieval, and blob garbage collection remain future work.
+
+`GET /v1/documents/{document_id}/versions/{version_id}/preview` checks Guard before exposing blocks and returns `202` while parsing, `409` when quarantined, or `404` when inaccessible. `GET .../download` applies the same Guard check before reading original bytes.
 
 Original files are immutable. A `DocumentVersion` owns normalized blocks; each `Chunk` points to a page/section/table/sheet/row/cell locator. Embeddings are derived and replaceable. Facts never replace citations to their original source.
 
@@ -190,12 +200,12 @@ All demo services are self-hosted and usable without a paid account.
 | Model inference | Google AI Studio Gemini free tier behind `ModelProvider` | Demo default; synthetic data only; model and provider remain configurable |
 | Fallback inference | Ollama adapter (optional) | Not required for the demo; useful for offline/private deployments later |
 | Embeddings/reranking | Sentence Transformers with BGE-family open models | Local, configurable, multilingual-capable |
-| Parsing | Docling; openpyxl for exact spreadsheet provenance | RapidOCR/Tesseract when OCR is required |
+| Parsing | `docling-parse` + `pypdf`, python-docx, openpyxl, deterministic CSV/TXT/Markdown | CPU-only, no OCR; exact source locators |
 | Database/search | PostgreSQL + pgvector | Relational data, full-text search, vectors, RLS |
 | Object storage | Local filesystem adapter for demo | S3-compatible adapter added when deployment requires it |
 | Identity | Keycloak | Self-hosted OIDC, demo users/groups/roles |
 | Policy | Open Policy Agent (OPA) | Versioned RBAC/ABAC policy-as-code |
-| Jobs | Celery + RabbitMQ | Ingestion and independent background work; not LangGraph state |
+| Jobs | Celery + Redis | One worker for the demo; Postgres outbox is durable recovery state. RabbitMQ is a future scale option |
 | Observability | Structured logs + OpenTelemetry | Langfuse FOSS is an optional local Compose profile |
 | Testing | pytest, Vitest only where useful, Playwright smoke tests | Security, retrieval, citations, graphs, and three journeys |
 | Tooling | uv, pnpm, Ruff, mypy, ESLint, Prettier | Versions pinned after the scaffold spike |
@@ -230,6 +240,7 @@ Kribu-Demo/
 |   |   |   |-- identity/           # OIDC context and tenant resolution
 |   |   |   |-- policy/             # OPA client and authorization service
 |   |   |   |-- documents/          # metadata, versions, upload lifecycle
+|   |   |   |-- ingestion/          # durable outbox dispatcher and Celery parse task
 |   |   |   |-- brain/              # provenance, facts, entities, retrieval
 |   |   |   |-- engine/             # graph, state, nodes, tools, checkpoints
 |   |   |   |-- skills/             # registry and three domain skill packs
@@ -238,7 +249,6 @@ Kribu-Demo/
 |   |   |   `-- audit/              # append-only application events
 |   |   |-- migrations/
 |   |   `-- tests/                   # focused unit/integration/security tests
-|   `-- worker/                      # ingestion and indexing Celery tasks
 |-- packages/
 |   |-- ui/                          # shared React primitives and tokens
 |   `-- api-client/                  # generated TypeScript API client
@@ -281,7 +291,7 @@ Every tenant-owned table carries `tenant_id`. Source-derived rows carry `documen
 
 ## 10. API surface
 
-- `POST /v1/documents/uploads`, `POST /v1/documents/{id}/versions`, `GET /v1/documents/{id}`
+- `POST /v1/documents/uploads`, `POST /v1/documents/{id}/versions`, `GET /v1/documents/{id}`, `GET /v1/documents/{id}/versions/{version_id}/preview`, `GET /v1/documents/{id}/versions/{version_id}/download`
 - `POST /v1/runs`, `GET /v1/runs/{id}`, `GET /v1/runs/{id}/events` (SSE)
 - `GET /v1/runs/{id}/findings`, `GET /v1/evidence/{id}`
 - `GET /v1/artifacts/{id}`

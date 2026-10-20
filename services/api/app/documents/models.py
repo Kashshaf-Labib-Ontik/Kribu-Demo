@@ -108,3 +108,126 @@ class UploadRequest(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+
+class DocumentIngestionJob(Base):
+    """Durable work record for deriving content from one immutable version."""
+
+    __tablename__ = "document_ingestion_jobs"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "document_id"],
+            ["documents.tenant_id", "documents.id"],
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "document_version_id"],
+            ["document_versions.tenant_id", "document_versions.id"],
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint("tenant_id", "id", name="uq_document_ingestion_jobs_tenant_id_id"),
+        UniqueConstraint("tenant_id", "document_version_id"),
+        Index("ix_document_ingestion_jobs_dispatch", "state", "lease_expires_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), primary_key=True)
+    tenant_id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), nullable=False)
+    document_id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), nullable=False)
+    document_version_id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), nullable=False)
+    actor_subject_id: Mapped[str] = mapped_column(Text, nullable=False)
+    state: Mapped[str] = mapped_column(String(20), nullable=False)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_code: Mapped[str | None] = mapped_column(String(80))
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class DocumentIngestionOutbox(Base):
+    """Database-backed recovery record; Redis never becomes the source of truth."""
+
+    __tablename__ = "document_ingestion_outbox"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "job_id"],
+            ["document_ingestion_jobs.tenant_id", "document_ingestion_jobs.id"],
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint("tenant_id", "job_id"),
+        Index("ix_document_ingestion_outbox_available", "available_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), primary_key=True)
+    tenant_id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), nullable=False)
+    job_id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), nullable=False)
+    available_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    publish_attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class DocumentExtraction(Base):
+    """Successful normalized representation of a specific original version."""
+
+    __tablename__ = "document_extractions"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "document_id"],
+            ["documents.tenant_id", "documents.id"],
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "document_version_id"],
+            ["document_versions.tenant_id", "document_versions.id"],
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint("tenant_id", "id", name="uq_document_extractions_tenant_id_id"),
+        UniqueConstraint("tenant_id", "document_version_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), primary_key=True)
+    tenant_id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), nullable=False)
+    document_id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), nullable=False)
+    document_version_id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), nullable=False)
+    parser_name: Mapped[str] = mapped_column(String(80), nullable=False)
+    parser_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    normalization_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    block_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class DocumentContentBlock(Base):
+    """An ordered normalized unit whose locator can later support an exact citation."""
+
+    __tablename__ = "document_content_blocks"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "extraction_id"],
+            ["document_extractions.tenant_id", "document_extractions.id"],
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint("tenant_id", "extraction_id", "ordinal"),
+        Index("ix_document_content_blocks_preview", "tenant_id", "document_version_id", "ordinal"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), primary_key=True)
+    tenant_id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), nullable=False)
+    extraction_id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), nullable=False)
+    document_id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), nullable=False)
+    document_version_id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), nullable=False)
+    ordinal: Mapped[int] = mapped_column(Integer, nullable=False)
+    block_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    locator: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

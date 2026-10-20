@@ -629,3 +629,76 @@ def test_callers_who_may_not_upload_cannot_probe_for_users(api: Api) -> None:
 
     assert response.status_code == 403
     assert response.json()["code"] == "upload_forbidden"
+
+
+# --- parsing preview and original download ------------------------------------------------
+
+
+def test_preview_waits_for_a_complete_parse_and_preserves_authorization(
+    api: Api, owner_db: Any
+) -> None:
+    created = api.upload("helen.hr", HR_METADATA, unique_pdf("preview")).json()
+    document_id = created["document_id"]
+    version_id = created["version"]["id"]
+
+    waiting = api.client.get(
+        f"/v1/documents/{document_id}/versions/{version_id}/preview",
+        headers=api.headers("helen.hr"),
+    )
+    denied = api.client.get(
+        f"/v1/documents/{document_id}/versions/{version_id}/preview",
+        headers=api.headers("mike"),
+    )
+    downloaded = api.client.get(
+        f"/v1/documents/{document_id}/versions/{version_id}/download",
+        headers=api.headers("helen.hr"),
+    )
+
+    assert waiting.status_code == 202
+    assert waiting.json()["status"] == "queued"
+    assert denied.status_code == 404
+    assert downloaded.status_code == 200
+    assert downloaded.content.startswith(b"%PDF-")
+
+    extraction_id = str(uuid4())
+    owner_db.execute(
+        "UPDATE document_ingestion_jobs SET state = 'ready' WHERE document_version_id = $1::uuid",
+        version_id,
+    )
+    owner_db.execute(
+        "INSERT INTO document_extractions "
+        "(id, tenant_id, document_id, document_version_id, parser_name, parser_version, "
+        "normalization_version, block_count) "
+        "VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 'test', '1', 'v1', 1)",
+        extraction_id,
+        DEMO_TENANT,
+        document_id,
+        version_id,
+    )
+    owner_db.execute(
+        "INSERT INTO document_content_blocks "
+        "(id, tenant_id, extraction_id, document_id, document_version_id, ordinal, "
+        "block_type, text, locator) "
+        "VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid, 1, 'paragraph', $6, $7::jsonb)",
+        str(uuid4()),
+        DEMO_TENANT,
+        extraction_id,
+        document_id,
+        version_id,
+        "SYNTHETIC ONLY: approved preview content.",
+        json.dumps({"kind": "text_line", "line": 1}),
+    )
+
+    ready = api.client.get(
+        f"/v1/documents/{document_id}/versions/{version_id}/preview",
+        headers=api.headers("helen.hr"),
+    )
+    assert ready.status_code == 200
+    assert ready.json()["blocks"] == [
+        {
+            "ordinal": 1,
+            "block_type": "paragraph",
+            "text": "SYNTHETIC ONLY: approved preview content.",
+            "locator": {"kind": "text_line", "line": 1},
+        }
+    ]

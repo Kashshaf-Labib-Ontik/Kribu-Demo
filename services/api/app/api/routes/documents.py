@@ -3,16 +3,28 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, Header, Request, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, File, Form, Header, Query, Request, UploadFile
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from app.core.config import Settings, get_settings
-from app.documents.contracts import DocumentResponse, UploadResponse
+from app.documents.contracts import (
+    DocumentIngestionStatusResponse,
+    DocumentPreviewResponse,
+    DocumentResponse,
+    UploadResponse,
+)
 from app.documents.dependencies import get_object_store
 from app.documents.errors import SingleFileRequiredError
-from app.documents.service import DocumentContext, create_document, create_version, read_document
+from app.documents.service import (
+    DocumentContext,
+    create_document,
+    create_version,
+    download_document_version,
+    read_document,
+    read_document_preview,
+)
 from app.documents.storage import ObjectStore
 from app.identity.contracts import CurrentUser
 from app.identity.dependencies import get_current_user, get_session_factory
@@ -88,3 +100,42 @@ async def get_document(
     context: Annotated[DocumentContext, Depends(document_context)],
 ) -> DocumentResponse:
     return await read_document(context, document_id=document_id)
+
+
+@router.get(
+    "/{document_id}/versions/{version_id}/preview",
+    response_model=DocumentPreviewResponse | DocumentIngestionStatusResponse,
+)
+async def get_document_preview(
+    document_id: UUID,
+    version_id: UUID,
+    context: Annotated[DocumentContext, Depends(document_context)],
+    cursor: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=200)] = 100,
+) -> DocumentPreviewResponse | JSONResponse:
+    preview = await read_document_preview(
+        context,
+        document_id=document_id,
+        version_id=version_id,
+        cursor=cursor,
+        limit=limit,
+    )
+    if isinstance(preview, DocumentIngestionStatusResponse):
+        return JSONResponse(status_code=202, content=preview.model_dump(mode="json"))
+    return preview
+
+
+@router.get("/{document_id}/versions/{version_id}/download")
+async def download_document(
+    document_id: UUID,
+    version_id: UUID,
+    context: Annotated[DocumentContext, Depends(document_context)],
+) -> StreamingResponse:
+    outcome = await download_document_version(
+        context, document_id=document_id, version_id=version_id
+    )
+    return StreamingResponse(
+        iter([outcome.content]),
+        media_type=outcome.media_type,
+        headers={"Content-Disposition": f'attachment; filename="{outcome.filename}"'},
+    )

@@ -22,6 +22,10 @@ TENANT_TABLES = (
     "resource_acl_grants",
     "demo_resource_content",
     "authorization_audit_events",
+    "document_ingestion_jobs",
+    "document_ingestion_outbox",
+    "document_extractions",
+    "document_content_blocks",
 )
 
 
@@ -68,6 +72,26 @@ def test_upgrade_compatibility_schema_and_constraints(owner_db: object) -> None:
         "uq_document_versions_tenant_id_id",
         "fk_upload_requests_document_version",
     }
+
+
+def test_derived_ingestion_tables_force_row_level_security(owner_db: object) -> None:
+    rows = owner_db.fetch(  # type: ignore[attr-defined]
+        "SELECT relname, relrowsecurity, relforcerowsecurity FROM pg_class "
+        "WHERE relname = ANY($1::text[]) ORDER BY relname",
+        [
+            "document_content_blocks",
+            "document_extractions",
+            "document_ingestion_jobs",
+            "document_ingestion_outbox",
+        ],
+    )
+
+    assert [(row["relrowsecurity"], row["relforcerowsecurity"]) for row in rows] == [
+        (True, True),
+        (True, True),
+        (True, True),
+        (True, True),
+    ]
 
 
 @pytest.mark.asyncio

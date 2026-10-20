@@ -85,7 +85,19 @@ uv run python -m scripts.verify_documents --confirm-synthetic
 Set-Location ../..
 ```
 
-Iteration 5 accepts one PDF, DOCX, XLSX, CSV, TXT, or Markdown file up to 25 MiB. Uploads require explicit read grants and an `Idempotency-Key`; original files and versions are immutable, storage keys never leave the API, and every create, version, or read decision is audited. The protected endpoints are `POST /v1/documents/uploads`, `POST /v1/documents/{id}/versions`, and `GET /v1/documents/{id}`.
+Iteration 6 adds Redis-backed, single-concurrency Celery parsing. PostgreSQL is authoritative: upload/version creation atomically writes a queued ingestion job and outbox row; the worker republishes queued work after a Redis outage, and duplicate messages cannot publish duplicate extractions. The worker parses PDF (CPU-only native Docling parser plus exact `pypdf` pages), DOCX, XLSX, CSV, TXT, and Markdown without LLMs or OCR. Successful versions publish normalized blocks and immutable locators in one transaction; malformed, encrypted, unsafe, or limit-exceeding inputs are quarantined and never previewable. The default limits are 120 seconds, 250 PDF pages, and 100,000 content units; all are configurable.
+
+The protected endpoints are `POST /v1/documents/uploads`, `POST /v1/documents/{id}/versions`, `GET /v1/documents/{id}`, `GET /v1/documents/{id}/versions/{version_id}/preview`, and `GET /v1/documents/{id}/versions/{version_id}/download`. Preview returns `202` while queued/processing and safe `409` when quarantined; inaccessible content remains `404`.
+
+Verify the asynchronous parsing lifecycle (safe generated content only):
+
+```powershell
+Set-Location services/api
+uv run python -m scripts.verify_document_parsing --confirm-synthetic
+Set-Location ../..
+```
+
+The repeatable source packs for NGO, HR, and client servicing are under `services/api/demo_data/`. Run `services/api/scripts/load_demo_documents.py --confirm-synthetic` after Compose is healthy; it uploads each source with its ACL and waits for a non-empty authorized preview.
 
 For faster application development, run PostgreSQL in Docker and the applications on the host:
 
@@ -116,4 +128,4 @@ Overrides: `KRIBU_TEST_OWNER_DATABASE_URL` (default `postgresql://kribu:kribu_de
 
 ## Current status
 
-Iterations 0-5 are implemented and verified. Iteration 5 provides governed document upload, immutable versioning, idempotent replay, tenant-safe object storage, and authorized metadata reads. Iteration 6 parsing and provenance is next; retrieval and natural-language query enforcement remain later iterations.
+Iterations 0-6 are implemented and verified locally. Iteration 6 adds durable parse jobs/outbox recovery, Redis + a single Celery worker, normalized provenance blocks, quarantine, and authorized preview/download. OCR, malware scanning, semantic chunking, embeddings, vector search, and retrieval remain intentionally deferred to Iteration 7.

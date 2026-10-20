@@ -105,3 +105,12 @@ class DocumentStoreUnavailableError(DocumentError):
             message="Document storage is temporarily unavailable.",
             status_code=503,
         )
+
+
+class DocumentPreviewUnavailableError(DocumentError):
+    def __init__(self) -> None:
+        super().__init__(
+            code="document_preview_unavailable",
+            message="A normalized preview is not available for this document version.",
+            status_code=409,
+        )

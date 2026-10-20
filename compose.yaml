@@ -128,6 +128,30 @@ services:
     mem_limit: 256m
     restart: unless-stopped
 
+  redis:
+    image: redis:7.4.2-alpine
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--appendfsync",
+        "everysec",
+        "--maxmemory",
+        "128mb",
+        "--maxmemory-policy",
+        "noeviction",
+      ]
+    volumes:
+      - kribu_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    mem_limit: 192m
+    restart: unless-stopped
+
   api:
     build:
       context: .
@@ -146,6 +170,12 @@ services:
       KRIBU_OPA_POLICY_VERSION: ${KRIBU_OPA_POLICY_VERSION:-guard-v2}
       KRIBU_DOCUMENT_STORE_PATH: /var/lib/kribu/documents
       KRIBU_UPLOAD_MAX_BYTES: ${KRIBU_UPLOAD_MAX_BYTES:-26214400}
+      KRIBU_CELERY_BROKER_URL: redis://redis:6379/0
+      KRIBU_INGESTION_OWNER_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-kribu}:${POSTGRES_PASSWORD:-kribu_dev_only}@postgres:5432/${POSTGRES_DB:-kribu}
+      KRIBU_INGESTION_POLL_SECONDS: ${KRIBU_INGESTION_POLL_SECONDS:-15}
+      KRIBU_INGESTION_TASK_TIMEOUT_SECONDS: ${KRIBU_INGESTION_TASK_TIMEOUT_SECONDS:-120}
+      KRIBU_INGESTION_MAX_PDF_PAGES: ${KRIBU_INGESTION_MAX_PDF_PAGES:-250}
+      KRIBU_INGESTION_MAX_CONTENT_UNITS: ${KRIBU_INGESTION_MAX_CONTENT_UNITS:-100000}
       KRIBU_MODEL_PROVIDER: ${KRIBU_MODEL_PROVIDER:-gemini}
       KRIBU_MODEL_DATA_POLICY: ${KRIBU_MODEL_DATA_POLICY:-synthetic_only}
       KRIBU_GEMINI_API_KEY: ${KRIBU_GEMINI_API_KEY:-}
@@ -179,6 +209,46 @@ services:
       retries: 12
     restart: unless-stopped
 
+  ingestion-worker:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    command:
+      [
+        "uv",
+        "run",
+        "--frozen",
+        "--no-dev",
+        "--package",
+        "kribu-api",
+        "celery",
+        "-A",
+        "app.ingestion.celery_app:celery_app",
+        "worker",
+        "--beat",
+        "--loglevel=INFO",
+        "--concurrency=1",
+      ]
+    environment:
+      KRIBU_ENVIRONMENT: development
+      KRIBU_DATABASE_URL: postgresql+asyncpg://kribu_app:${KRIBU_APP_DB_PASSWORD:-kribu_app_dev_only}@postgres:5432/${POSTGRES_DB:-kribu}
+      KRIBU_INGESTION_OWNER_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-kribu}:${POSTGRES_PASSWORD:-kribu_dev_only}@postgres:5432/${POSTGRES_DB:-kribu}
+      KRIBU_CELERY_BROKER_URL: redis://redis:6379/0
+      KRIBU_DOCUMENT_STORE_PATH: /var/lib/kribu/documents
+      KRIBU_INGESTION_POLL_SECONDS: ${KRIBU_INGESTION_POLL_SECONDS:-15}
+      KRIBU_INGESTION_TASK_TIMEOUT_SECONDS: ${KRIBU_INGESTION_TASK_TIMEOUT_SECONDS:-120}
+      KRIBU_INGESTION_MAX_PDF_PAGES: ${KRIBU_INGESTION_MAX_PDF_PAGES:-250}
+      KRIBU_INGESTION_MAX_CONTENT_UNITS: ${KRIBU_INGESTION_MAX_CONTENT_UNITS:-100000}
+    volumes:
+      - kribu_document_store:/var/lib/kribu/documents
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    mem_limit: 1536m
+    restart: unless-stopped
+
   web:
     build:
       context: .
@@ -208,6 +278,7 @@ volumes:
   kribu_postgres_data:
   kribu_keycloak_postgres_data:
   kribu_document_store:
+  kribu_redis_data:
 
 networks:
   policy_internal:

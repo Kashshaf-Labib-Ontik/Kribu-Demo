@@ -25,7 +25,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.concurrency import run_in_threadpool
 
 from app.documents.contracts import (
+    DocumentIngestionStatusResponse,
     DocumentMetadataInput,
+    DocumentPreviewBlockResponse,
+    DocumentPreviewResponse,
     DocumentResponse,
     DocumentVersionResponse,
     GrantResponse,
@@ -34,13 +37,21 @@ from app.documents.contracts import (
 from app.documents.errors import (
     AclInvalidError,
     AclRequiredError,
+    DocumentPreviewUnavailableError,
     IdempotencyKeyInvalidError,
     IdempotencyKeyRequiredError,
     IdempotencyKeyReusedError,
     MetadataInvalidError,
     UploadForbiddenError,
 )
-from app.documents.models import Document, DocumentVersion, UploadRequest
+from app.documents.models import (
+    Document,
+    DocumentContentBlock,
+    DocumentExtraction,
+    DocumentIngestionJob,
+    DocumentVersion,
+    UploadRequest,
+)
 from app.documents.storage import ObjectStore
 from app.documents.validation import AnalyzedFile, analyze_upload, display_filename
 from app.identity.contracts import CurrentUser, IdentityResponse
@@ -48,6 +59,7 @@ from app.identity.errors import IdentityNotProvisionedError
 from app.identity.models import UserProfile
 from app.identity.service import get_identity_profile
 from app.identity.tenancy import tenant_transaction
+from app.ingestion.service import QUARANTINED, READY, queue_document_ingestion
 from app.policy.adapters import from_descriptor
 from app.policy.authorization import (
     RESOURCE_READ,
@@ -86,6 +98,14 @@ class DocumentContext:
 class UploadOutcome:
     status_code: int
     body: dict[str, Any]
+    ingestion_job_id: UUID | None = None
+
+
+@dataclass(frozen=True)
+class DownloadOutcome:
+    content: bytes
+    filename: str
+    media_type: str
 
 
 class _SameAsLatestError(Exception):
@@ -305,7 +325,9 @@ async def _own_duplicate(
     return next((c for c in candidates if existing[c.document_id] == wanted), None)
 
 
-def version_response(version: DocumentVersion) -> DocumentVersionResponse:
+def version_response(
+    version: DocumentVersion, *, ingestion_status: str | None = None
+) -> DocumentVersionResponse:
     return DocumentVersionResponse(
         id=version.id,
         version_number=version.version_number,
@@ -314,19 +336,25 @@ def version_response(version: DocumentVersion) -> DocumentVersionResponse:
         media_type=version.media_type,
         original_filename=version.original_filename,
         status=version.status,
+        ingestion_status=ingestion_status,
         created_at=version.created_at,
     )
 
 
 def _upload_outcome(
-    status_code: int, document_id: UUID, version: DocumentVersion, *, duplicate: bool = False
+    status_code: int,
+    document_id: UUID,
+    version: DocumentVersion,
+    *,
+    duplicate: bool = False,
+    ingestion_job_id: UUID | None = None,
 ) -> UploadOutcome:
     body = UploadResponse(
         document_id=document_id,
-        version=version_response(version),
+        version=version_response(version, ingestion_status="queued" if ingestion_job_id else None),
         duplicate_of=document_id if duplicate else None,
     )
-    return UploadOutcome(status_code, body.model_dump(mode="json"))
+    return UploadOutcome(status_code, body.model_dump(mode="json"), ingestion_job_id)
 
 
 def _new_version(
@@ -443,7 +471,6 @@ async def create_document(
         filename=filename,
         key=stored_key,
     )
-    outcome = _upload_outcome(201, document_id, version)
     try:
         async with tenant_transaction(context.session_factory, user) as session:
             session.add(
@@ -484,6 +511,13 @@ async def create_document(
             await session.flush()
             session.add(version)
             await session.flush()
+            job_id = await queue_document_ingestion(
+                session,
+                current_user=user,
+                document_id=document_id,
+                version_id=version.id,
+            )
+            outcome = _upload_outcome(201, document_id, version, ingestion_job_id=job_id)
             session.add(
                 _upload_request(
                     context,
@@ -577,9 +611,15 @@ async def create_version(
                 filename=filename,
                 key=stored_key,
             )
-            outcome = _upload_outcome(201, document_id, version)
             session.add(version)
             await session.flush()
+            job_id = await queue_document_ingestion(
+                session,
+                current_user=user,
+                document_id=document_id,
+                version_id=version.id,
+            )
+            outcome = _upload_outcome(201, document_id, version, ingestion_job_id=job_id)
             session.add(
                 _upload_request(
                     context,
@@ -648,6 +688,15 @@ async def read_document(context: DocumentContext, *, document_id: UUID) -> Docum
                 .order_by(DocumentVersion.version_number)
             )
         ).all()
+        jobs = (
+            await session.scalars(
+                select(DocumentIngestionJob).where(
+                    DocumentIngestionJob.document_id == document_id,
+                    DocumentIngestionJob.tenant_id == user.tenant_id,
+                )
+            )
+        ).all()
+    status_by_version = {job.document_version_id: job.state for job in jobs}
     return DocumentResponse(
         id=document.id,
         title=descriptor.title,
@@ -666,5 +715,139 @@ async def read_document(context: DocumentContext, *, document_id: UUID) -> Docum
             )
             for grant in grants
         ],
-        versions=[version_response(version) for version in versions],
+        versions=[
+            version_response(version, ingestion_status=status_by_version.get(version.id))
+            for version in versions
+        ],
+    )
+
+
+async def _authorize_document_read(context: DocumentContext, *, document_id: UUID) -> Document:
+    """Run the Guard decision before loading version-derived data or original bytes."""
+    user = context.current_user
+    try:
+        async with tenant_transaction(context.session_factory, user) as session:
+            profile: IdentityResponse = await get_identity_profile(session, user)
+            descriptor, grants = await load_resource(
+                session, tenant_id=user.tenant_id, resource_id=document_id
+            )
+            document = await session.get(Document, document_id)
+    except IdentityNotProvisionedError:
+        await _audit_unprovisioned(context, action=RESOURCE_READ, resource_id=document_id)
+        raise
+
+    found = descriptor is not None and document is not None
+    decision = await authorize(
+        session_factory=context.session_factory,
+        opa_client=context.opa_client,
+        current_user=user,
+        subject=subject_attributes(user, profile.department),
+        action=RESOURCE_READ,
+        resource=(
+            from_descriptor(descriptor, grants)
+            if descriptor is not None and found
+            else unavailable_resource(document_id, user.tenant_id)
+        ),
+        purpose=READ_PURPOSE,
+        correlation_id=context.correlation_id,
+        resource_found=found,
+    )
+    if not decision.allow or document is None:
+        raise ResourceNotFoundError()
+    return document
+
+
+async def read_document_preview(
+    context: DocumentContext,
+    *,
+    document_id: UUID,
+    version_id: UUID,
+    cursor: int,
+    limit: int,
+) -> DocumentPreviewResponse | DocumentIngestionStatusResponse:
+    await _authorize_document_read(context, document_id=document_id)
+    user = context.current_user
+    async with tenant_transaction(context.session_factory, user) as session:
+        version = await session.scalar(
+            select(DocumentVersion).where(
+                DocumentVersion.id == version_id,
+                DocumentVersion.document_id == document_id,
+                DocumentVersion.tenant_id == user.tenant_id,
+            )
+        )
+        if version is None:
+            raise ResourceNotFoundError()
+        job = await session.scalar(
+            select(DocumentIngestionJob).where(
+                DocumentIngestionJob.document_version_id == version_id,
+                DocumentIngestionJob.tenant_id == user.tenant_id,
+            )
+        )
+        if job is None or job.state in {"queued", "processing"}:
+            return DocumentIngestionStatusResponse(
+                document_id=document_id,
+                version_id=version_id,
+                status="processing" if job is not None and job.state == "processing" else "queued",
+                retry_after_seconds=5,
+            )
+        if job.state == QUARANTINED:
+            raise DocumentPreviewUnavailableError()
+        extraction = await session.scalar(
+            select(DocumentExtraction).where(
+                DocumentExtraction.document_version_id == version_id,
+                DocumentExtraction.tenant_id == user.tenant_id,
+            )
+        )
+        if job.state != READY or extraction is None:
+            raise DocumentPreviewUnavailableError()
+        blocks = (
+            await session.scalars(
+                select(DocumentContentBlock)
+                .where(
+                    DocumentContentBlock.extraction_id == extraction.id,
+                    DocumentContentBlock.tenant_id == user.tenant_id,
+                    DocumentContentBlock.ordinal > cursor,
+                )
+                .order_by(DocumentContentBlock.ordinal)
+                .limit(limit + 1)
+            )
+        ).all()
+    page = blocks[:limit]
+    return DocumentPreviewResponse(
+        document_id=document_id,
+        version_id=version_id,
+        parser_name=extraction.parser_name,
+        parser_version=extraction.parser_version,
+        normalization_version=extraction.normalization_version,
+        blocks=[
+            DocumentPreviewBlockResponse(
+                ordinal=block.ordinal,
+                block_type=block.block_type,
+                text=block.text,
+                locator=block.locator,
+            )
+            for block in page
+        ],
+        next_cursor=page[-1].ordinal if len(blocks) > limit and page else None,
+    )
+
+
+async def download_document_version(
+    context: DocumentContext, *, document_id: UUID, version_id: UUID
+) -> DownloadOutcome:
+    await _authorize_document_read(context, document_id=document_id)
+    user = context.current_user
+    async with tenant_transaction(context.session_factory, user) as session:
+        version = await session.scalar(
+            select(DocumentVersion).where(
+                DocumentVersion.id == version_id,
+                DocumentVersion.document_id == document_id,
+                DocumentVersion.tenant_id == user.tenant_id,
+            )
+        )
+    if version is None:
+        raise ResourceNotFoundError()
+    content = await run_in_threadpool(context.store.read, version.storage_key)
+    return DownloadOutcome(
+        content=content, filename=version.original_filename, media_type=version.media_type
     )

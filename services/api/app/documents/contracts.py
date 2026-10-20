@@ -71,6 +71,7 @@ class DocumentVersionResponse(BaseModel):
     media_type: str
     original_filename: str
     status: str
+    ingestion_status: str | None = None
     created_at: datetime
 
 
@@ -92,3 +93,27 @@ class UploadResponse(BaseModel):
     document_id: UUID
     version: DocumentVersionResponse
     duplicate_of: UUID | None = None
+
+
+class DocumentIngestionStatusResponse(BaseModel):
+    document_id: UUID
+    version_id: UUID
+    status: Literal["queued", "processing", "ready", "quarantined"]
+    retry_after_seconds: int | None = None
+
+
+class DocumentPreviewBlockResponse(BaseModel):
+    ordinal: int
+    block_type: str
+    text: str
+    locator: dict[str, object]
+
+
+class DocumentPreviewResponse(BaseModel):
+    document_id: UUID
+    version_id: UUID
+    parser_name: str
+    parser_version: str
+    normalization_version: str
+    blocks: list[DocumentPreviewBlockResponse]
+    next_cursor: int | None = None

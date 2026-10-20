@@ -29,6 +29,8 @@ REPLACE_RETRY_SECONDS = 0.01
 class ObjectStore(Protocol):
     def put(self, source: BinaryIO, *, tenant_id: UUID, sha256: bytes) -> str: ...
 
+    def read(self, key: str) -> bytes: ...
+
     def probe(self) -> None: ...
 
 
@@ -74,6 +76,21 @@ class LocalFileObjectStore:
             raise DocumentStoreUnavailableError() from exc
         finally:
             _remove_quietly(probe_file)
+
+    def read(self, key: str) -> bytes:
+        """Return a stored object after rejecting path traversal or absolute keys.
+
+        The storage key always comes from the database; this extra validation keeps the adapter
+        safe if a future caller accidentally treats a client value as a key.
+        """
+        relative = Path(key)
+        if relative.is_absolute() or ".." in relative.parts:
+            raise DocumentStoreUnavailableError()
+        try:
+            return (self._root / relative).read_bytes()
+        except OSError as exc:
+            logger.warning("document store read failed", exc_info=True)
+            raise DocumentStoreUnavailableError() from exc
 
     @staticmethod
     def _replace(temporary: Path, target: Path, sha256: bytes) -> None:

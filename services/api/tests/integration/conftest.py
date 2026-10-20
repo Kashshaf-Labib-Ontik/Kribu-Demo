@@ -106,8 +106,8 @@ def seeded_database(pytestconfig: pytest.Config) -> dict[str, dict[str, int]]:
         # Prove a new database reaches head and can be rebuilt from its downgrade path.
         command.upgrade(config, "head")
         command.downgrade(config, "base")
-        # Then reproduce the supported Iteration 4 -> Iteration 5 upgrade boundary.
-        command.upgrade(config, "0002_guard_resources")
+        # Then reproduce the published Iteration 4 -> current-head upgrade boundary.
+        command.upgrade(config, "0004_upgrade_compatibility")
         command.upgrade(config, "head")
     finally:
         if previous is None:

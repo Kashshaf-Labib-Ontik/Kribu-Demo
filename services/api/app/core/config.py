@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     opa_policy_version: str = Field(default="guard-v2", min_length=1)
     document_store_path: Path = Path("storage/documents")
     upload_max_bytes: int = Field(default=26_214_400, ge=1, le=268_435_456)
+    celery_broker_url: SecretStr = SecretStr("redis://localhost:6379/0")
+    ingestion_owner_database_url: SecretStr | None = None
+    ingestion_poll_seconds: int = Field(default=15, ge=5, le=300)
+    ingestion_task_timeout_seconds: int = Field(default=120, ge=10, le=600)
+    ingestion_max_pdf_pages: int = Field(default=250, ge=1, le=2_000)
+    ingestion_max_content_units: int = Field(default=100_000, ge=1, le=1_000_000)
     model_provider: Literal["gemini"] = "gemini"
     model_data_policy: Literal["synthetic_only"] = "synthetic_only"
     gemini_api_key: SecretStr | None = None

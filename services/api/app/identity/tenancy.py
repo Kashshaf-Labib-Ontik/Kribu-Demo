@@ -24,6 +24,13 @@ async def set_tenant_context(session: AsyncSession, current_user: CurrentUser) -
     )
 
 
+async def set_trusted_tenant_context(
+    session: AsyncSession, *, tenant_id: str, subject_id: str
+) -> None:
+    """Bind persisted worker context after resolving it through the trusted ingestion job."""
+    await session.execute(_SET_CONTEXT, {"tenant_id": tenant_id, "user_id": subject_id})
+
+
 @asynccontextmanager
 async def tenant_transaction(
     session_factory: async_sessionmaker[AsyncSession], current_user: CurrentUser

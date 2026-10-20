@@ -1,0 +1,6 @@
+case_id,channel,issue,resolution,reopened,service_stage
+C-101,email,Invoice was sent late,Resolved,yes,Billing
+C-102,phone,Delayed invoice,Resolved,no,Billing
+C-103,chat,Invoice arrived after deadline,Open,yes,Billing
+C-104,email,Password reset request,Resolved,no,Access
+C-105,phone,Invoice was sent late,Open,yes,Billing

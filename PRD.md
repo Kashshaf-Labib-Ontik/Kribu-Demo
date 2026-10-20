@@ -1,6 +1,6 @@
 # KRIBU Demo Product Requirements
 
-**Status:** Iterations 0-5 are implemented and verified; Iteration 6 parsing and provenance is next
+**Status:** Iterations 0-6 are implemented and verified locally; Iteration 7 authorized retrieval is next
 
 **Scope:** Local, synthetic-data demo
 
@@ -88,15 +88,15 @@ The demo proves these capabilities with synthetic files because live client data
 
 ### Brain and ingestion
 
-- **BRN-01:** Upload PDF, DOCX, XLSX, CSV, TXT, Markdown, and common image files.
+- **BRN-01:** Upload PDF, DOCX, XLSX, CSV, TXT, and Markdown. Image/OCR ingestion is deferred.
 - **BRN-02:** Validate file type and size, hash content, detect duplicates, and quarantine failed files.
 - **BRN-03:** Preserve immutable originals and create versioned normalized representations.
-- **BRN-04:** Extract text, tables, headings, page numbers, sheet names, rows, and cells using deterministic parsers where possible.
+- **BRN-04:** Extract normalized blocks with exact PDF page, DOCX paragraph/table/row/column, XLSX sheet/A1, CSV row/column, and text/Markdown line/heading locators using deterministic parsers.
 - **BRN-05:** Chunk without losing document version or page/cell provenance.
 - **BRN-06:** Attach tenant, domain, sensitivity, owner, department, project, date, and ACL metadata before indexing.
 - **BRN-07:** Provide authorized hybrid search using PostgreSQL full-text search and pgvector, fused and optionally reranked.
 - **BRN-08:** Store facts, entities, relationships, embeddings, and conversational/run state separately from source documents.
-- **BRN-09:** Re-index safely when a parser, embedding model, or ACL changes.
+- **BRN-09:** Re-index safely when a parser, embedding model, or ACL changes. For the demo, a durable Postgres outbox safely republishes queued parsing work after Redis/worker interruption.
 
 ### Engine and skills
 
@@ -124,6 +124,7 @@ The demo proves these capabilities with synthetic files because live client data
 - **Security:** zero cross-tenant or unauthorized-document leakage in automated security tests.
 - **Grounding:** every material factual claim is supported by an accessible citation.
 - **Reliability:** duplicate jobs are idempotent; interrupted workflows resume from a checkpoint.
+- **Ingestion safety:** a version becomes previewable only after all normalized blocks and provenance are committed; failed parsing is quarantined with a safe error code.
 - **Performance target:** first progress event within 2 seconds; simple retrieval response within 15 seconds and multi-document analysis within 90 seconds on the reference machine. External-model latency and quota delays are reported, not hidden.
 - **Accessibility:** keyboard access, visible focus, semantic markup, and WCAG 2.2 AA color contrast.
 - **Privacy:** only synthetic demo content may be sent to Gemini; hosted telemetry remains disabled by default.

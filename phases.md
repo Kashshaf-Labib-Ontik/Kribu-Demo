@@ -69,8 +69,12 @@ The commit messages below are targets and may be adjusted to match the actual sl
 
 ### Iteration 6 - Parsing and provenance
 
-- Parse selected document types with Docling/openpyxl and preserve page/cell locators.
-- Add failure quarantine and normalized document preview.
+- Add Redis `7.4.2` with AOF, `noeviction`, a 128 MiB cap, and a single-concurrency Celery worker; do not add RabbitMQ for the low-volume demo.
+- Atomically create durable ingestion jobs and Postgres outbox rows with each uploaded version. Redis carries only opaque job IDs; PostgreSQL remains recovery state and duplicate delivery is safe.
+- Parse CPU-only PDFs through `docling-parse` with exact `pypdf` page locators, plus deterministic DOCX, XLSX, CSV, TXT, and Markdown parsers. Publish extraction metadata and blocks only in one successful transaction.
+- Quarantine malformed, encrypted, archive-expansion-risk, oversized, timeout-exceeded, or limit-exceeded sources. Enforce configurable defaults: 120 seconds, 250 PDF pages, 100,000 content units.
+- Protect preview and download through the existing Guard; `202` means parsing, `409` means quarantined, and inaccessible versions remain `404`.
+- **Commit:** `Preserve document extraction provenance`
 - **Commit:** `Preserve document extraction provenance`
 
 ### Iteration 7 - Authorized hybrid retrieval
@@ -166,4 +170,4 @@ Use a small working exercise for each topic rather than completing long courses 
 
 ## 8. Current delivery gate
 
-Iterations 0-5 are implemented and verified. Iteration 5 includes governed uploads, immutable versions, idempotency, RLS/OPA enforcement, object storage, and a forward-compatible upgrade from Iteration 4. Iteration 6 parsing and provenance is the next delivery phase. Implementation commits and pushes still require explicit owner approval.
+Iterations 0-6 are implemented and verified locally. Iteration 6 adds RLS-protected job, outbox, extraction, and block tables; migration `0005_document_provenance` plus forward-only `0006_outbox_returning`; Redis + one Celery worker; exact source locators; quarantine; and authorized preview/download. Iteration 7 authorized hybrid retrieval is next. Implementation commits and pushes still require explicit owner approval.
